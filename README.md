@@ -1,11 +1,11 @@
-README for LuaJIT 2.0.3
+README for DynASM
 -----------------------
 
-LuaJIT is a Just-In-Time (JIT) compiler for the Lua programming language.
+DynASM is a Dynamic Assembler for code generation engines.
 
 Project Homepage: http://luajit.org/
 
-LuaJIT is Copyright (C) 2005-2014 Mike Pall.
-LuaJIT is free software, released under the MIT license.
+DynASM is Copyright (C) 2005-2014 Mike Pall.
+DynASM is free software, released under the MIT license.
 See full Copyright Notice in the COPYRIGHT file.
 
