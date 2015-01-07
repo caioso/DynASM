@@ -31,6 +31,7 @@ local concat, sort = table.concat, table.sort
 local g_opt, g_arch
 local wline, werror, wfatal, wwarn
 local bit = bit or require("bit")
+local band, shl, shr, bor, sar, bnot = bit.band, bit.lshift, bit.rshift, bit.bor, bit.arshift, bit.bnot
 
 -- Action name list.
 -- CHECK: Keep this in sync with the C code!
@@ -613,7 +614,7 @@ local map_op = {
   efsabs_2 =		"100002c4RR",
   efsnabs_2 =		"100002c5RR",
   efsneg_2 =		"100002c6RR",
-  efsmul_3 =   "100002c8RRR",
+  efsmul_3 =		"100002c8RRR",
   efsdiv_3 =		"100002c9RRR",
   efscmpgt_3 =		"100002ccXRR",
   efscmpgt_2 =		"100002cc-RR",
@@ -924,13 +925,13 @@ local map_op = {
   lfdpx_3            = "7c00062eHRR",
   lfddx_3            = "7c000646FRR",
   lfdepx_3           = "7c0004beFRR",
-  lharx_4	           = "7c0000e8RRRL",
+  lharx_4	     = "7c0000e8RRRL",
   lhdx_3             = "7c000446RRR",
   lhepx_3            = "7c00023eRRR",
   lhzcix_3           = "7c00066aRRR",
   lq_2               = "e0000000Mc",
   lqarx_4            = "7c000228MRRL",
-  lvepx_3	           = "7c00024eVRR",
+  lvepx_3	     = "7c00024eVRR",
   lvepxl_3           = "7c00020eVRR",    
   lvewx_3            = "7c00008eVRR",
   lvls_3             = "7c00000cVRR",
@@ -940,7 +941,7 @@ local map_op = {
   lwdx_3             = "7c000486RRR",
   lwepx_3            = "7c00003eRRR",
   lwzcix_3           = "7c00062aRRR",
-  lvsl_3 	           = "7c00000cVRR",
+  lvsl_3 	      = "7c00000cVRR",
   lxsdx_3            = "7C000498iRR",
   lxsiwax_3          = "7c000098iRR",
   lxsiwzx_3          = "7c000018iRR",
@@ -974,11 +975,12 @@ local map_op = {
   mfdcrux_2          = "7c000246RR-",
   mfcdrx_2           = "7c000206RR-",
   mfmsr_1            = "7c0000a6R--",
-  mfocrf_2           = "7c000026RE", 
+  mfocrf_2           = "7c000026RE", --The extra 1 at bit 11 is added when E is seen in the opcode
   mfpmr_2            = "7c00029cR*",
   mfspr_2            = "7c0002a6R*",
   mfsr_2             = "7c0004a6RZ",
   mfsrin_2           = "7c000526R-R",
+  --mftb_1           = "7c0002e6R",
   mfvscr_1           = "10000604V--",
   mfvsrd_2           = "7c000066Rn",
   mfvsrwz_2          = "7c0000e6Rn",
@@ -1031,9 +1033,9 @@ local map_op = {
   rfmci_0            = "4c00004c",
   rldcl_4            = "78000010RR~Ru.", 
   rldcr_4            = "78000012RR~Ru.", 
-  rldic_4            = "78000008RR~ou.",
-  rldicl_4           = "78000000RR~ou.",
-  rldicr_4           = "78000004RR~ou.",
+  rldic_4            = "78000008RR~ou.", --
+  rldicl_4           = "78000000RR~ou.", --
+  rldicr_4           = "78000004RR~ou.", --
   rldimi_4           = "7800000cRR~o{.",
   rvwinkle_0         = "4c0003e4",
   sc_1               = "44000002?",
@@ -1277,7 +1279,7 @@ local map_op = {
   wait_1             = "7c00007ce",         
   wrtee_1            = "7c000106R--",
   wrteei_1           = "7c000146--[",
-  xsabsdp_2          = "f0000564@-$+1x0",
+  xsabsdp_2          = "f0000564@-$+1x0", --Gotta Change Here (-$ or -!?)
   xsadddp_3          = "f0000100@!$+021",
   xsaddsp_3          = "f0000000@!$+021",
   xscmpodp_3         = "f0000158X!$+x21",
@@ -1536,11 +1538,11 @@ local function parse_vs(expr, mode)
     if r <= 63 then 
        if r >= 0 then
           if mode == 1 then
-          	return bit.band(r,31)
+          	return band(r,31)
 	  elseif mode == 0 then
                 return r
           elseif mode == 2 then 
-                return bit.rshift(bit.band(r,32),5)
+                return shr(band(r,32),5)
           end
       end
     end
@@ -1571,9 +1573,9 @@ local function parse_5bit_field(expr, signed)
     elseif (signed == 1) then--signed and shifted
     	if (r >= -16 and r <= 15) then
 	    if r < 0 then
-		return bit.bor((r + 16), 16);
+		return bor((r + 16), 16);
     	    else
- 		return bit.band(r,15);
+ 		return band(r,15);
   	    end
 	end 
     end
@@ -1589,7 +1591,7 @@ local function parse_10bit_field(expr,type)
 	if type == 0 then
           return r 
 	else
-	  return bit.bor(bit.lshift(bit.band(r,31),5),bit.rshift(bit.band(r,992),5));
+	  return bor(shl(band(r,31),5),shr(band(r,992),5));
 	end 
        end
     end
@@ -1720,14 +1722,14 @@ end
 local function parse_imm(imm, bits, shift, scale, signed)
   local n = tonumber(imm)
   if n then
-    local m = bit.arshift(n, scale)
-    if bit.lshift(m, scale) == n then
+    local m = sar(n, scale)
+    if shl(m, scale) == n then
       if signed then
-        local s = bit.arshift(m, bits-1)
-        if s == 0 then return bit.lshift(m, shift)
-        elseif s == -1 then return bit.lshift(m + bit.lshift(1, bits), shift) end
+        local s = sar(m, bits-1)
+        if s == 0 then return shl(m, shift)
+        elseif s == -1 then return shl(m + shl(1, bits), shift) end
       else
-        if bit.arshift(m, bits) == 0 then return bit.lshift(m, shift) end
+        if sar(m, bits) == 0 then return shl(m, shift) end
       end
     end
     werror("out of range immediate `"..imm.."'")
@@ -1866,22 +1868,22 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1
     elseif p == "o" then
       local value = parse_6bit_field(params[n])
-      local bit_value = bit.rshift(value,5)
-      value = bit.band(value,31)
+      local bit_value = shr(value,5)
+      value = band(value,31)
       rs = rs - 5; op = op + value * 2^rs; 
-      op = bit.bor(bit.lshift(bit_value,1),op);
+      op = bor(shl(bit_value,1),op);
       n = n + 1;
     elseif p == "?" then
       local value = parse_7bit_field(params[n]);
-      op = bit.bor(bit.lshift(value,5),op);
+      op = bor(shl(value,5),op);
       n = n + 1;
     elseif p == "i" then
       rs = rs - 5; 
       op = op + parse_vs(params[n],1) * 2^rs + parse_vs(params[n],2); 
       n = n + 1;
     elseif p == "n" then
-      local first_register = bit.rshift(bit.band(op,65011712),21)
-      op = bit.band(op,-65011713) 
+      local first_register = shr(band(op,65011712),21)
+      op = band(op,-65011713) 
       op = op + parse_vs(params[n],1) * 2^rs + parse_vs(params[n],2); 
       rs = rs - 5; op = op + first_register * 2^rs; 
       n = n + 1;
@@ -1901,19 +1903,19 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + parse_4bit_field(params[n]) * 2^rs; 
       n = n + 1;
     elseif p == "k" then
-      op = bit.bor(bit.lshift(parse_1bit_field(params[n]),21),op) 
+      op = bor(shl(parse_1bit_field(params[n]),21),op) 
       rs = rs - 1; 
       n = n + 1;
     elseif p == "p" then
-      op = bit.bor(bit.lshift(parse_1bit_field(params[n]),11),op) 
+      op = bor(shl(parse_1bit_field(params[n]),11),op) 
       rs = rs - 1; 
       n = n + 1;
     elseif p == "m" then
-      op = bit.bor(bit.lshift(parse_3bit_field(params[n]),21),op) 
+      op = bor(shl(parse_3bit_field(params[n]),21),op) 
       n = n + 1;
     elseif p == "N" then
-      op = bit.bor(bit.lshift(1,10),op) 
-      op = bit.bor(bit.lshift(parse_1bit_field(params[n]),9),op) 
+      op = bor(shl(1,10),op) 
+      op = bor(shl(parse_1bit_field(params[n]),9),op) 
       n = n + 1;
     elseif p == "A" then
       rs = rs - 5; 
@@ -1964,65 +1966,65 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + parse_cr(params[n]); 
       n = n + 1;
     elseif p == "B" then
-      op = bit.bor(bit.lshift(parse_2bit_field(params[n]),19),op);
+      op = bor(shl(parse_2bit_field(params[n]),19),op);
       n = n + 1;
     elseif p == "t" then
-      op = bit.bor(bit.lshift(parse_5bit_field(params[n],0),16),op);
+      op = bor(shl(parse_5bit_field(params[n],0),16),op);
       n = n + 1;
     elseif p == "f" then
-      op = bit.bor(bit.lshift(parse_5bit_field(params[n],1),16),op);
+      op = bor(shl(parse_5bit_field(params[n],1),16),op);
       n = n + 1;
     elseif p == "z" then
-      op = bit.bor(bit.lshift(parse_8bit_field(params[n]),17),op);
+      op = bor(shl(parse_8bit_field(params[n]),17),op);
       rs = rs - 10;
       n = n + 1;
     elseif p == "w" then
-      op = bit.bor(bit.lshift(parse_1bit_field(params[n]),25),op);
+      op = bor(shl(parse_1bit_field(params[n]),25),op);
       n = n + 1
     elseif p == "@" then
       local vs_value = parse_vs(params[n],0);
-      local msb = bit.rshift(bit.band(vs_value,32),5);
-      vs_value = bit.band(vs_value,31);
+      local msb = shr(band(vs_value,32),5);
+      vs_value = band(vs_value,31);
       rs = rs - 5;
       t_msb = msb;
       op = op + vs_value* 2^rs;
       n = n + 1
     elseif p == "!" then
       local vs_value = parse_vs(params[n],0);
-      local msb = bit.rshift(bit.band(vs_value,32),5);
-      vs_value = bit.band(vs_value,31);
+      local msb = shr(band(vs_value,32),5);
+      vs_value = band(vs_value,31);
       rs = rs - 5;
       a_msb = msb;
       op = op + vs_value* 2^rs;
       n = n + 1
     elseif p == "$" then
       local vs_value = parse_vs(params[n],0);
-      local msb = bit.rshift(bit.band(vs_value,32),5);
-      vs_value = bit.band(vs_value,31);
+      local msb = shr(band(vs_value,32),5);
+      vs_value = band(vs_value,31);
       rs = rs - 5;
      b_msb = msb;
       op = op + vs_value* 2^rs;
       n = n + 1
     elseif p == "&" then
       local vs_value = parse_vs(params[n],0);
-      local msb = bit.rshift(bit.band(vs_value,32),5);
-      vs_value = bit.band(vs_value,31);
+      local msb = shr(band(vs_value,32),5);
+      vs_value = band(vs_value,31);
       rs = rs - 5;
       op = op + vs_value* 2^rs;
-      op = bit.bor(bit.lshift(msb,3),op);
+      op = bor(shl(msb,3),op);
       n = n + 1
     elseif p == "l" then
       rs = rs - 3; 
       op = op + parse_2bit_field(params[n]) * 2^rs; 
       n = n + 1;
     elseif p == "x" then
-      op = bit.bor(bit.lshift(parse_1bit_field(params[n]),16),op);
+      op = bor(shl(parse_1bit_field(params[n]),16),op);
       n = n + 1;
     elseif p == "b" then
-      op = bit.bor(bit.lshift(parse_1bit_field(params[n]),20),op);
+      op = bor(shl(parse_1bit_field(params[n]),20),op);
       n = n + 1;
     elseif p == "j" then
-      op = bit.bor(bit.lshift(parse_1bit_field(params[n]),16),op);
+      op = bor(shl(parse_1bit_field(params[n]),16),op);
       n = n + 1;
     elseif p == "G" then
       op = op + parse_imm(params[n], 8, 12, 0, false); 
@@ -2040,16 +2042,16 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + parse_5bit_field(params[n],0) * 2^rs; 
       n = n + 1;
     elseif p == "y" then
-      local vb_value = bit.rshift(bit.band(op,2031616),16);
-      op = bit.band(op,4292935679);
+      local vb_value = shr(band(op,2031616),16);
+      op = band(op,4292935679);
       op = op + parse_5bit_field(params[n],0) * 2^rs;  
-      op = bit.bor(bit.lshift(vb_value,11),op);
+      op = bor(shl(vb_value,11),op);
       n = n + 1;
     elseif p == "a" then
-      local vb_value = bit.rshift(bit.band(op,2031616),16);
-      op = bit.band(op,4292935679);
+      local vb_value = shr(band(op,2031616),16);
+      op = band(op,4292935679);
       op = op + parse_3bit_field(params[n]) * 2^rs;  
-      op = bit.bor(bit.lshift(vb_value,11),op);
+      op = bor(shl(vb_value,11),op);
       n = n + 1;
     elseif p == "Q" then
       rs = rs - 10; 
@@ -2072,17 +2074,17 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + parse_1bit_field(params[n]) * 2^rs; 
       n = n + 1;
     elseif p == "]" then
-      op = bit.bor(bit.lshift(parse_1bit_field(params[n]),21),op);
+      op = bor(shl(parse_1bit_field(params[n]),21),op);
       n = n + 1;
     elseif p == "[" then
-      op = bit.bor(bit.lshift(parse_1bit_field(params[n]),15),op);
+      op = bor(shl(parse_1bit_field(params[n]),15),op);
       n = n + 1;
     elseif p == "Y" then 
       rs = rs - 2; 
       op = op + parse_2bit_field(params[n]) * 2^rs;
       n = n + 1;
     elseif p == "(" then
-      op = bit.bor(bit.lshift(parse_2bit_field(params[n]),16),op);
+      op = bor(shl(parse_2bit_field(params[n]),16),op);
       n = n + 1;
     elseif p == "r" then
       rs = rs - 5; 
@@ -2100,11 +2102,11 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1;
     elseif p == "/" then
       local value = parse_8bit_field(params[n]);
-      op = bit.bor(op,bit.lshift(value,12));
+      op = bor(op,shl(value,12));
       n = n + 1;
     elseif p == "|" then
       local value = parse_10bit_field(params[n],1);
-      op = bit.bor(op,bit.lshift(value,11));
+      op = bor(op,shl(value,11));
       n = n + 1;
     elseif p == "u" then
       rs = rs - 5; 
@@ -2115,7 +2117,7 @@ map_op[".template__"] = function(params, template, nparams)
      op = op + parse_6bit_field(params[n]) * 2^rs;
      n = n + 1;
     elseif p == "d" then
-      op = bit.bor(bit.lshift(parse_2bit_field(params[n]),16),op) 
+      op = bor(shl(parse_2bit_field(params[n]),16),op) 
       n = n + 1
     elseif p == "J" or p == "K" then
       local mode, n, s = parse_label(params[n], false)
@@ -2144,32 +2146,32 @@ map_op[".template__"] = function(params, template, nparams)
            if string.sub(template,string.len(template),string.len(template)) ~= "x" then
               pos_b = tonumber(string.sub(template,string.len(template),string.len(template)));
               bit_b = b_msb;
-              op = bit.band(op,bit.bnot(bit.lshift(1,pos_b)));
+              op = band(op,bnot(shl(1,pos_b)));
 
            end
            
            if string.sub(template,string.len(template) - 1,string.len(template) - 1) ~= "x" then
               pos_a = tonumber(string.sub(template,string.len(template) - 1,string.len(template) - 1));
               bit_a = a_msb;
-              op = bit.band(op,bit.bnot(bit.lshift(1,pos_a)));
+              op = band(op,bnot(shl(1,pos_a)));
            end
            
            if string.sub(template,string.len(template) - 2,string.len(template) - 2) ~= "x" then
               pos_t = tonumber(string.sub(template,string.len(template) - 2,string.len(template) - 2));
               bit_t = t_msb;
-              op = bit.band(op,bit.bnot(bit.lshift(1,pos_t)));
+              op = band(op,bnot(shl(1,pos_t)));
            end 
 
            if string.sub(template,string.len(template),string.len(template)) ~= "x" then
-              op = bit.bor(bit.lshift(bit_b,pos_b),op);
+              op = bor(shl(bit_b,pos_b),op);
            end
            
            if string.sub(template,string.len(template) - 1,string.len(template) - 1) ~= "x" then
-              op = bit.bor(bit.lshift(bit_a,pos_a),op);
+              op = bor(shl(bit_a,pos_a),op);
            end
            
            if string.sub(template,string.len(template) - 2,string.len(template) - 2) ~= "x" then
-               op = bit.bor(bit.lshift(bit_t,pos_t),op);
+               op = bor(shl(bit_t,pos_t),op);
            end 
            
            break
@@ -2180,7 +2182,7 @@ map_op[".template__"] = function(params, template, nparams)
     elseif p == "." then
       -- Ignored.
     elseif p == "," then
-       local vb_value = bit.band(op,1024);
+       local vb_value = band(op,1024);
        n = n + 1;
     else
       assert(false)
@@ -2353,5 +2355,3 @@ end
 return _M
 
 ------------------------------------------------------------------------------
-
-
