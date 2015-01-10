@@ -5,6 +5,10 @@
 -- See dynasm.lua for full copyright notice.
 ------------------------------------------------------------------------------
 
+--to be in ppc64.lua
+local ppc64 = true
+--to be in ppc64.lua
+
 -- Module information:
 local _info = {
   arch =	"ppc64",
@@ -30,8 +34,9 @@ local concat, sort = table.concat, table.sort
 -- Inherited tables and callbacks.
 local g_opt, g_arch
 local wline, werror, wfatal, wwarn
-local bit = bit or require("bit32")
+local bit = bit or require("bit")
 local band, shl, shr, bor, sar, bnot = bit.band, bit.lshift, bit.rshift, bit.bor, bit.arshift, bit.bnot
+local tohex = bit.tohex
 
 -- Action name list.
 -- CHECK: Keep this in sync with the C code!
@@ -60,12 +65,10 @@ local actargs = { 0 }
 -- Current number of section buffer positions for dasm_put().
 local secpos = 1
 
-------------------------------------------------------------------------------
+--Function modes
+function_modes = {lsb5 = 1, msb = 2, signed = 1, split_10bit = 1}
 
--- Return 8 digit hex number.
-local function tohex(x)
-  return sub(format("%08x", x), -8) -- Avoid 64 bit portability problem in Lua.
-end
+------------------------------------------------------------------------------
 
 -- Dump action names and numbers.
 local function dumpactions(out)
@@ -92,7 +95,8 @@ end
 
 -- Add word to action list.
 local function wputxw(n)
-  assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range")
+  if ppc64 then  assert(n >= -0xffffffff and n <= 0xffffffff and n % 1 == 0, "word out of range"..n)
+  else assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range") end
   actlist[#actlist+1] = n
 end
 
@@ -128,7 +132,8 @@ end
 
 -- Store word to reserved position.
 local function wputpos(pos, n)
-  assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range")
+  if ppc64 then  assert(n >= -0xffffffff and n <= 0xffffffff and n % 1 == 0, "word out of range"..n)
+  else assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range") end
   actlist[pos] = n
 end
 
@@ -809,9 +814,7 @@ local map_op = {
   evmwlumianw_3 =	"100005c8RRR",
   evmwlsmianw_3 =	"100005c9RRR",
 
-  --64-Bit POWER Instructions
-  --Full Listing available at POWER ISA 2.0.7 Document (https://www.power.org/wp-content/uploads/2013/05/PowerISA_V2.07_PUBLIC.pdf)
-  --The following instructions were organized in alphabetical order
+  --NEW INSTRUCTIONS
 
   -- Primary Opcode 4
   vaddubm_3 =		"10000000VVV",
@@ -1502,7 +1505,7 @@ end
 -- Parse GPR (Fixed Point Registers) : r[0-31]
 -- Pair == 0 : standard mode
 -- Pair == 1 : pair mode (even address only)
-local function parse_gpr(expr, pair)
+local function parse_gpr(expr) 
   local tname, ovreg = match(expr, "^([%w_]+):(r[1-3]?[0-9])$")
   local tp = map_type[tname or expr]
   if tp then
@@ -1516,15 +1519,31 @@ local function parse_gpr(expr, pair)
   if r then
     r = tonumber(r)
     if r <= 31 then
-        if pair == 0 then 
-	  return r, tp 
-	else
-	  if r%2 == 0 then
-            return r, tp
-	  else
-	    werror("bad register pair (address must be even) `"..expr.."'")
-	  end
-	end
+        return r, tp 
+    end
+  end
+  werror("bad register name `"..expr.."'")
+end
+
+local function parse_gpr_pair(expr) 
+  local tname, ovreg = match(expr, "^([%w_]+):(r[1-3]?[0-9])$")
+  local tp = map_type[tname or expr]
+  if tp then
+    local reg = ovreg or tp.reg
+    if not reg then
+      werror("type `"..(tname or expr).."' needs a register override")
+    end
+    expr = reg
+  end
+  local r = match(expr, "^r([1-3]?[0-9])$")
+  if r then
+    r = tonumber(r)
+    if r <= 31 then
+      if r%2 == 0 then
+        return r, tp 
+      else
+        werror("bad register pair (address must be even) `"..expr.."'")
+      end
     end
   end
   werror("bad register name `"..expr.."'")
@@ -1550,174 +1569,47 @@ local function parse_vr(expr)
 end
 
 -- Parse VS (Vector Scalar Registers) : vs[0-63]
--- Mode == 0 : Returns the full register address
--- Mode == 1 : Returns the first 5 LSB of the register address 
--- Mode == 2 : Returns the MSB (bit 6) of the register address
 local function parse_vs(expr, mode)
+  if mode == nil then mode = 0 end
   local r = match(expr, "^vs([1-6]?[0-9])$")
   if r then
     r = tonumber(r)
-    if r <= 63 then 
-       if r >= 0 then
-          if mode == 1 then
-          	return band(r, 31)
-	  elseif mode == 0 then
-                return r
-          elseif mode == 2 then 
-                return shr(band(r, 32), 5)
-          end
+    if r <= 63 and r >= 0 then
+      if mode == function_modes.lsb5 then
+        return band(r, 31)
+      elseif mode == 0 then
+        return r
+      elseif mode == function_modes.msb then 
+        return shr(band(r, 32), 5)
       end
     end
   end
   werror("bad vector-scalar extension name `"..expr.."'")
 end
 
--- Parses Generic 4-bit Fields
-local function parse_4bit_field(expr)
-    local r = tonumber(expr)
-    if r <= 15 then 
-       if r >= 0 then
-          return r 
-       end
-    end
-  werror("bad field value (must be within [0, 15]) `"..expr.."'")
-end
-
--- Parses Generic 5-bit Fields Signed or Unsigned
-local function parse_5bit_field(expr, signed)
-  local r = match(expr, "^(-?[0-3]?[0-9])$")
-  if r then
-    r = tonumber(r)
-    if signed == 0 then
-    	if r <= 31 and r >= 0 then 
-          return r 
-    	end
-    elseif signed == 1 then --signed and shifted
-    	if r >= -16 and r <= 15 then
-	    if r < 0 then
-		return bor((r + 16), 16);
-    	    else
- 		return band(r, 15);
-  	    end
-	end 
-    end
-  end
-  werror("bad field value (must be within [0, 31] -unsigned or [-16, 15] -signed) `"..expr.."'")
-end
-
--- Parses Generic 10-bit Fields
-local function parse_10bit_field(expr, type)
-    local r = tonumber(expr)
-    if r <= 1023 then 
-       if r >= 0 then
-	if type == 0 then
-          return r 
-	else
-	  return bor(shl(band(r, 31), 5), shr(band(r, 992), 5));
-	end 
-       end
-    end
-  werror("bad field value (must be within [0, 1023] `"..expr.."'")
-end
-
--- Parses Generic 15-bit Fields
-local function parse_15bit_field(expr)
-   local r = tonumber(expr)
-    if r <= 32767 then 
-       if r >= 0 then
-          return r 
-       end
-    end
-  werror("bad field value (must be within [0, 32767]) `"..expr.."'")
-end
-
--- Parse Generic 8-bit Fields
-local function parse_8bit_field(expr)
-   local r = tonumber(expr)
-    if r <= 255 then 
-       if r >= 0 then
-          return r 
-       end
-    end
-  werror("bad field value (must be within [0, 255]) `"..expr.."'")
-end
-
--- Parse Generic 2-bit Fields
-local function parse_2bit_field(expr)
-    local r = tonumber(expr)
-    
-    if r <= 3 then 
-       if r >= 0 then
-          return r 
-       end
-    end
-  werror("bad field value (must be within [0, 3]) `"..expr.."'")
-end
- 
--- Parses Generic 6-bit Fields
-local function parse_6bit_field(expr)
-  local r = match(expr, "^([1-6]?[0-9])$")
-  if r then
-    r = tonumber(r)
-    if r <= 63 then 
-       if r >= 0 then
-          return r 
-       end
-    end
-  end
-  werror("bad field value (must be within [0-63]) `"..expr.."'")
-end
-
--- Parses Generic 1-bit Fields
-local function parse_1bit_field(expr)
-  local r = tonumber(expr)
-    if r <= 1 then 
-       if r >= 0 then
-          return r 
-       end
-    end
-  werror("bad field value (must be 0 or 1) `"..expr.."'")
-end
-
--- Parse Generic 7-bit Fields
-local function parse_7bit_field(expr)
-  local r = tonumber(expr)
-    if r <= 127 then 
-       if r >= 0 then
-          return r 
-       end
-    end
-  werror("bad field value (must be within [0, 127]) `"..expr.."'")
-end
-
--- Parse Generic 3-bit Fields
-local function parse_3bit_field(expr)
-   local r = tonumber(expr)
-    if r <= 7 then 
-       if r >= 0 then
-          return r 
-       end
-    end
-  werror("bad field value (must be within [0, 7]) `"..expr.."'")
-end
-
 -- Parse Floating Point Registers : f[0-31]
--- Pair == 0 : standard mode
--- Pair == 1 : pair mode (address must be even)
-local function parse_fpr(expr, pair)
+local function parse_fpr(expr)
   local r = match(expr, "^f([1-3]?[0-9])$")
   if r then
     r = tonumber(r)
     if r <= 31 then 
-	if pair == 0 then
-	  return r 
-  	else
-	  if r%2 == 0 then
-             return r
-          else
-             werror ("bad register pair (address must be even) `"..expr.."'")
-          end
-        end
+      return r 
+    end
+  end
+  werror("bad register name `"..expr.."'")
+end
+
+-- Parse Floating Point Registers Pairs : f[0-31] (even)
+local function parse_fpr_pair(expr)
+  local r = match(expr, "^f([1-3]?[0-9])$")
+  if r then
+    r = tonumber(r)
+    if r <= 31 then 
+      if r%2 == 0 then
+        return r 
+      else
+        werror ("bad register pair (address must be even) `"..expr.."'")
+      end
     end
   end
   werror("bad register name `"..expr.."'")
@@ -1747,16 +1639,22 @@ local function parse_imm(imm, bits, shift, scale, signed)
     local m = sar(n, scale)
     if shl(m, scale) == n then
       if signed then
-        local s = sar(m, bits-1)
-        if s == 0 then return shl(m, shift)
-        elseif s == -1 then return shl(m + shl(1, bits), shift) end
+	local s = sar(m, bits-1)
+	if s == 0 then return shl(m, shift)
+	elseif s == -1 then return shl(m + shl(1, bits), shift) end
       else
-        if sar(m, bits) == 0 then return shl(m, shift) end
+ if sar(m, bits) == 0 then return shl(m, shift) end
       end
     end
     werror("out of range immediate `"..imm.."'")
   elseif match(imm, "^r([1-3]?[0-9])$") or
-         match(imm, "^([%w_]+):(r[1-3]?[0-9])$") then
+	match(imm, "^([%w_]+):(r[1-3]?[0-9])$") or 
+   match(imm, "^f([1-3]?[0-9])$") or
+	 match(imm, "^([%w_]+):(f[1-3]?[0-9])$") or 
+   match(imm, "^v([1-3]?[0-9])$") or
+	 match(imm, "^([%w_]+):(v[1-3]?[0-9])$") or
+   match(imm, "^vs([1-3]?[0-9])$") or
+	 match(imm, "^([%w_]+):(vs[1-3]?[0-9])$") then
     werror("expected immediate operand, got register")
   else
     waction("IMM", (signed and 32768 or 0)+scale*1024+bits*32+shift, imm)
@@ -1764,17 +1662,31 @@ local function parse_imm(imm, bits, shift, scale, signed)
   end
 end
 
+-- Identify and split 10 bit field, depending o type
+local function parse_10bit_field(expr, type)
+  if type == nil then type = 0 end
+  local r = parse_imm(expr, 10, 0, 0, false)
+  if r <= 1023 and r >= 0 then
+    if type == 0 then
+      return r 
+    else
+      return bor(shl(band(r, 31), 5), shr(band(r, 992), 5));
+    end 
+  end
+  werror("bad field value (must be within [0, 1023] `"..expr.."'")
+end
+
 -- Parse Displacements
 local function parse_disp(disp)
   local imm, reg = match(disp, "^(.*)%(([%w_:]+)%)$")
   if imm then
-    local r = parse_gpr(reg, 0)
+    local r = parse_gpr(reg)
     if r == 0 then werror("cannot use r0 in displacement") end
     return r*65536 + parse_imm(imm, 16, 0, 0, true)
   end
   local reg, tailr = match(disp, "^([%w_:]+)%s*(.*)$")
   if reg and tailr ~= "" then
-    local r, tp = parse_gpr(reg, 0)
+    local r, tp = parse_gpr(reg)
     if r == 0 then werror("cannot use r0 in displacement") end
     if tp then
       waction("IMM", 32768+16*32, format(tp.ctypefmt, tailr))
@@ -1788,13 +1700,13 @@ end
 local function parse_u5disp(disp, scale)
   local imm, reg = match(disp, "^(.*)%(([%w_:]+)%)$")
   if imm then
-    local r = parse_gpr(reg, 0)
+    local r = parse_gpr(reg)
     if r == 0 then werror("cannot use r0 in displacement") end
     return r*65536 + parse_imm(imm, 5, 11, scale, false)
   end
   local reg, tailr = match(disp, "^([%w_:]+)%s*(.*)$")
   if reg and tailr ~= "" then
-    local r, tp = parse_gpr(reg, 0)
+    local r, tp = parse_gpr(reg)
     if r == 0 then werror("cannot use r0 in displacement") end
     if tp then
       waction("IMM", scale*1024+5*32+11, format(tp.ctypefmt, tailr))
@@ -1808,14 +1720,14 @@ end
 local function parse_u14disp(disp, scale)
 local imm, reg = match(disp, "^(.*)%(([%w_:]+)%)$")
   if imm then
-    local r = parse_gpr(reg, 0)
+    local r = parse_gpr(reg)
     --werror(r .. " " .. imm)
     if r == 0 then werror("cannot use r0 in displacement") end
     return r*65536 + parse_imm(imm, 14, 2, scale, true)
   end
   local reg, tailr = match(disp, "^([%w_:]+)%s*(.*)$")
   if reg and tailr ~= "" then
-    local r, tp = parse_gpr(reg, 0)
+    local r, tp = parse_gpr(reg)
     if r == 0 then werror("cannot use r0 in displacement") end
     if tp then
       waction("IMM", scale*1024+5*32+11, format(tp.ctypefmt, tailr))
@@ -1874,7 +1786,7 @@ map_op[".template__"] = function(params, template, nparams)
   for p in gmatch(sub(template, 9), ".") do
     if p == "R" then
       rs = rs - 5; 
-      op = op + parse_gpr(params[n], 0) * 2^rs;  
+      op = op + parse_gpr(params[n]) * 2^rs;  
       n = n + 1;
     elseif p == "V" then
       rs = rs - 5; 
@@ -1882,62 +1794,62 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1;
     elseif p == "F" then
       rs = rs - 5; 
-      op = op + parse_fpr(params[n], 0) * 2^rs;
+      op = op + parse_fpr(params[n]) * 2^rs;
       n = n + 1;
     elseif p == "v" then
       rs = rs - 5; 
-      op = op + parse_6bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 6, 0, 0, false) * 2^rs; 
       n = n + 1
     elseif p == "o" then
-      local value = parse_6bit_field(params[n])
+      local value = parse_imm(params[n], 6, 0, 0, false)
       local bit_value = shr(value, 5)
       value = band(value, 31)
       rs = rs - 5; op = op + value * 2^rs; 
       op = bor(shl(bit_value, 1), op);
       n = n + 1;
     elseif p == "?" then
-      local value = parse_7bit_field(params[n]);
+      local value = parse_imm(params[n], 7, 0, 0, false);
       op = bor(shl(value, 5), op);
       n = n + 1;
     elseif p == "i" then
       rs = rs - 5; 
-      op = op + parse_vs(params[n], 1) * 2^rs + parse_vs(params[n], 2); 
+      op = op + parse_vs(params[n], function_modes.lsb5) * 2^rs + parse_vs(params[n], function_modes.msb); 
       n = n + 1;
     elseif p == "n" then
       local first_register = shr(band(op, 65011712), 21)
       op = band(op, -65011713) 
-      op = op + parse_vs(params[n], 1) * 2^rs + parse_vs(params[n], 2); 
+      op = op + parse_vs(params[n], function_modes.lsb5) * 2^rs + parse_vs(params[n], function_modes.msb); 
       rs = rs - 5; op = op + first_register * 2^rs; 
       n = n + 1;
     elseif p == "L" then 
-      op = op + parse_1bit_field(params[n]); 
+      op = op + parse_imm(params[n], 1, 0, 0, false); 
       n = n + 1;
     elseif p == "M" then
       rs = rs - 5; 
-      op = op + parse_gpr(params[n], 1) * 2^rs; 
+      op = op + parse_gpr_pair(params[n]) * 2^rs; 
       n = n + 1;
     elseif p == "H" then
       rs = rs - 5; 
-      op = op + parse_fpr(params[n], 1) * 2^rs; 
+      op = op + parse_fpr_pair(params[n]) * 2^rs; 
       n = n + 1;
     elseif p == "Z" then
       rs = rs - 5; 
-      op = op + parse_4bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 4, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "k" then
-      op = bor(shl(parse_1bit_field(params[n]), 21), op) 
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 21), op) 
       rs = rs - 1; 
       n = n + 1;
     elseif p == "p" then
-      op = bor(shl(parse_1bit_field(params[n]), 11), op) 
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 11), op) 
       rs = rs - 1; 
       n = n + 1;
     elseif p == "m" then
-      op = bor(shl(parse_3bit_field(params[n]), 21), op) 
+      op = bor(shl(parse_imm(params[n], 3, 0, 0, false), 21), op) 
       n = n + 1;
     elseif p == "N" then
       op = bor(shl(1, 10), op) 
-      op = bor(shl(parse_1bit_field(params[n]), 9), op) 
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 9), op) 
       n = n + 1;
     elseif p == "A" then
       rs = rs - 5; 
@@ -1945,11 +1857,11 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1;
     elseif p == "}" then
       rs = rs - 5;
-      op = op + parse_5bit_field(params[n], 1)*2^rs;
+      op = op + parse_imm(params[n], 5, rs, 0, true);
       n = n + 1;
     elseif p == "h" then
       rs = rs - 5; 
-      op = op + parse_2bit_field(params[n])* 2^rs; 
+      op = op + parse_imm(params[n], 2, 0, 0, false)* 2^rs; 
       n = n + 1;
     elseif p == "S" then
       rs = rs - 5; 
@@ -1988,23 +1900,23 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + parse_cr(params[n]); 
       n = n + 1;
     elseif p == "B" then
-      op = bor(shl(parse_2bit_field(params[n]), 19), op);
+      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 19), op);
       n = n + 1;
     elseif p == "t" then
-      op = bor(shl(parse_5bit_field(params[n], 0), 16), op);
+      op = bor(shl(parse_imm(params[n], 5, 0, 0, false), 16), op);
       n = n + 1;
     elseif p == "f" then
-      op = bor(shl(parse_5bit_field(params[n], 1), 16), op);
+      op = bor(shl(parse_imm(params[n], 5, 0, 0, true), 16), op);
       n = n + 1;
     elseif p == "z" then
-      op = bor(shl(parse_8bit_field(params[n]), 17), op);
+      op = bor(shl(parse_imm(params[n], 8, 0, 0, false), 17), op);
       rs = rs - 10;
       n = n + 1;
     elseif p == "w" then
-      op = bor(shl(parse_1bit_field(params[n]), 25), op);
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 25), op);
       n = n + 1
     elseif p == "@" then
-      local vs_value = parse_vs(params[n], 0);
+      local vs_value = parse_vs(params[n]);
       local msb = shr(band(vs_value, 32), 5);
       vs_value = band(vs_value, 31);
       rs = rs - 5;
@@ -2012,7 +1924,7 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + vs_value* 2^rs;
       n = n + 1
     elseif p == "!" then
-      local vs_value = parse_vs(params[n], 0);
+      local vs_value = parse_vs(params[n]);
       local msb = shr(band(vs_value, 32), 5);
       vs_value = band(vs_value, 31);
       rs = rs - 5;
@@ -2020,7 +1932,7 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + vs_value* 2^rs;
       n = n + 1
     elseif p == "$" then
-      local vs_value = parse_vs(params[n], 0);
+      local vs_value = parse_vs(params[n]);
       local msb = shr(band(vs_value, 32), 5);
       vs_value = band(vs_value, 31);
       rs = rs - 5;
@@ -2028,7 +1940,7 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + vs_value* 2^rs;
       n = n + 1
     elseif p == "&" then
-      local vs_value = parse_vs(params[n], 0);
+      local vs_value = parse_vs(params[n]);
       local msb = shr(band(vs_value, 32), 5);
       vs_value = band(vs_value, 31);
       rs = rs - 5;
@@ -2037,109 +1949,109 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1
     elseif p == "l" then
       rs = rs - 3; 
-      op = op + parse_2bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 2, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "x" then
-      op = bor(shl(parse_1bit_field(params[n]), 16), op);
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 16), op);
       n = n + 1;
     elseif p == "b" then
-      op = bor(shl(parse_1bit_field(params[n]), 20), op);
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 20), op);
       n = n + 1;
     elseif p == "j" then
-      op = bor(shl(parse_1bit_field(params[n]), 16), op);
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 16), op);
       n = n + 1;
     elseif p == "G" then
       op = op + parse_imm(params[n], 8, 12, 0, false); 
       n = n + 1;
     elseif p == "P" then
       rs = rs - 4; 
-      op = op + parse_4bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 4, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "T" then
       rs = rs - 5; 
-      op = op + parse_5bit_field(params[n], 0) * 2^rs; 
+      op = op + parse_imm(params[n], 5, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "q" then
       rs = rs - 5; 
-      op = op + parse_5bit_field(params[n], 0) * 2^rs; 
+      op = op + parse_imm(params[n], 5, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "y" then
       local vb_value = shr(band(op, 2031616), 16);
       op = band(op, 4292935679);
-      op = op + parse_5bit_field(params[n], 0) * 2^rs;  
+      op = op + parse_imm(params[n], 5, 0, 0, false) * 2^rs;  
       op = bor(shl(vb_value, 11), op);
       n = n + 1;
     elseif p == "a" then
       local vb_value = shr(band(op, 2031616), 16);
       op = band(op, 4292935679);
-      op = op + parse_3bit_field(params[n]) * 2^rs;  
+      op = op + parse_imm(params[n], 3, 0, 0, false) * 2^rs;  
       op = bor(shl(vb_value, 11), op);
       n = n + 1;
     elseif p == "Q" then
       rs = rs - 10; 
-      op = op + parse_10bit_field(params[n], 0) * 2^rs; 
+      op = op + parse_10bit_field(params[n]) * 2^rs; 
       n = n + 1;
     elseif p == "*" then
       rs = rs - 10;
-      op = op + parse_10bit_field(params[n], 1) * 2^rs;
+      op = op + parse_10bit_field(params[n], function_modes.split_10bit) * 2^rs;
       n = n + 1;
     elseif p == "s" then
       rs = rs - 1; 
-      op = op + parse_1bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 1, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "e" then
       rs = rs - 5; 
-      op = op + parse_2bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 2, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "g" then
       rs = rs - 5; 
-      op = op + parse_1bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 1, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "]" then
-      op = bor(shl(parse_1bit_field(params[n]), 21), op);
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 21), op);
       n = n + 1;
     elseif p == "[" then
-      op = bor(shl(parse_1bit_field(params[n]), 15), op);
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 15), op);
       n = n + 1;
     elseif p == "Y" then 
       rs = rs - 2; 
-      op = op + parse_2bit_field(params[n]) * 2^rs;
+      op = op + parse_imm(params[n], 2, 0, 0, false) * 2^rs;
       n = n + 1;
     elseif p == "(" then
-      op = bor(shl(parse_2bit_field(params[n]), 16), op);
+      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 16), op);
       n = n + 1;
     elseif p == "r" then
       rs = rs - 5; 
-      op = op + parse_2bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 2, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "O" then
       rs = rs - 15; 
-      op = op + parse_15bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 15, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "E" then
       rs = rs - 1; 
       op = op + 1 * 2^rs; 
       rs = rs - 8; 
-      op = op + parse_8bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 8, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "/" then
-      local value = parse_8bit_field(params[n]);
+      local value = parse_imm(params[n], 8, 0, 0, false);
       op = bor(op, shl(value, 12));
       n = n + 1;
     elseif p == "|" then
-      local value = parse_10bit_field(params[n], 1);
+      local value = parse_10bit_field(params[n], function_modes.split_10bit);
       op = bor(op, shl(value, 11));
       n = n + 1;
     elseif p == "u" then
       rs = rs - 5; 
-      op = op + parse_6bit_field(params[n]) * 2^rs; 
+      op = op + parse_imm(params[n], 6, 0, 0, false) * 2^rs; 
       n = n + 1;
     elseif p == "{" then
      rs = rs - 6;
-     op = op + parse_6bit_field(params[n]) * 2^rs;
+     op = op + parse_imm(params[n], 6, 0, 0, false) * 2^rs;
      n = n + 1;
     elseif p == "d" then
-      op = bor(shl(parse_2bit_field(params[n]), 16), op) 
+      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 16), op) 
       n = n + 1
     elseif p == "J" or p == "K" then
       local mode, n, s = parse_label(params[n], false)
