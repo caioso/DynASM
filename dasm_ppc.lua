@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------------
--- DynASM PPC64 module.
+-- DynASM PPC/PPC64 module.
 --
 -- Copyright (C) 2005-2015 Mike Pall. All rights reserved.
 -- See dynasm.lua for full copyright notice.
@@ -11,8 +11,8 @@ local ppc64 = ppc64
 
 -- Module information:
 local _info = {
-  arch =	"ppc64",
-  description =	"DynASM PPC64 module",
+  arch =	ppc64 and "ppc64" or "ppc",
+  description =	"DynASM PPC/PPC64 module",
   version =	"1.3.0",
   vernum =	 10300,
   release =	"2011-05-05",
@@ -1481,7 +1481,7 @@ end
 -- Add more branch mnemonics.
 for cond,c in pairs(map_cond) do
   local b1 = "b"..cond
-  local c1 = (c%4)*0x00010000 + (c < 4 and 0x01000000 or 0)
+  local c1 = shl(band(c, 3), 16) + (c < 4 and 0x01000000 or 0)
   -- bX[l]
   map_op[b1.."_1"] = tohex(0x40800000 + c1).."K"
   map_op[b1.."y_1"] = tohex(0x40a00000 + c1).."K"
