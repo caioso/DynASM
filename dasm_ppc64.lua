@@ -814,9 +814,9 @@ local map_op = {
   evmwlumianw_3 =	"100005c8RRR",
   evmwlsmianw_3 =	"100005c9RRR",
 
-  --NEW INSTRUCTIONS
-
-  -- Primary Opcode 4
+  --PPC64 INSTRUCTIONS0
+ 
+  -- Opcode 4
   vaddubm_3 =		"10000000VVV",
   vmaxub_3 =		"10000002VVV",
   vrlb_3 =		"10000004VVV",
@@ -1647,13 +1647,13 @@ local function parse_imm(imm, bits, shift, scale, signed)
     end
     werror("out of range immediate `"..imm.."'")
   elseif match(imm, "^r([1-3]?[0-9])$") or
-	 match(imm, "^([%w_]+):(r[1-3]?[0-9])$") or 
+         match(imm, "^([%w_]+):(r[1-3]?[0-9])$") or 
          match(imm, "^f([1-3]?[0-9])$") or
-	 match(imm, "^([%w_]+):(f[1-3]?[0-9])$") or 
+         match(imm, "^([%w_]+):(f[1-3]?[0-9])$") or 
          match(imm, "^v([1-3]?[0-9])$") or
-	 match(imm, "^([%w_]+):(v[1-3]?[0-9])$") or
+         match(imm, "^([%w_]+):(v[1-3]?[0-9])$") or
          match(imm, "^vs([1-3]?[0-9])$") or
-	 match(imm, "^([%w_]+):(vs[1-3]?[0-9])$") then
+         match(imm, "^([%w_]+):(vs[1-3]?[0-9])$") then
     werror("expected immediate operand, got register")
   else
     waction("IMM", (signed and 32768 or 0)+scale*1024+bits*32+shift, imm)
@@ -1757,9 +1757,6 @@ map_op[".template__"] = function(params, template, nparams)
   if not params then return sub(template, 9) end
   local op = tonumber(sub(template, 1, 8), 16)
   local n, rs = 1, 26
-  local t_msb = 0;
-  local a_msb = 0;
-  local b_msb = 0;
   
   -- Limit number of section buffer positions used bmakey a single dasm_put().
   -- A single opcode needs a maximum of 3 positions (rlwinm).
@@ -1769,276 +1766,172 @@ map_op[".template__"] = function(params, template, nparams)
   -- Process each character.
   for p in gmatch(sub(template, 9), ".") do
     if p == "R" then
-      rs = rs - 5; 
-      op = op + parse_gpr(params[n]) * 2^rs;  
-      n = n + 1;
+      rs = rs - 5; op = op + parse_gpr(params[n]) * 2^rs; n = n + 1;
     elseif p == "V" then
-      rs = rs - 5; 
-      op = op + parse_vr(params[n]) * 2^rs; 
-      n = n + 1;
+      rs = rs - 5;  op = op + parse_vr(params[n]) * 2^rs; n = n + 1;
     elseif p == "F" then
-      rs = rs - 5; 
-      op = op + parse_fpr(params[n]) * 2^rs;
-      n = n + 1;
+      rs = rs - 5; op = op + parse_fpr(params[n]) * 2^rs; n = n + 1;
     elseif p == "v" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 6, rs, 0, false); 
-      n = n + 1
+      rs = rs - 5; op = op + parse_imm(params[n], 6, rs, 0, false); n = n + 1;
     elseif p == "o" then
       local value = parse_imm(params[n], 6, 0, 0, false)
       local bit_value = shr(value, 5)
-      value = band(value, 31)
-      rs = rs - 5; op = op + value * 2^rs; 
-      op = bor(shl(bit_value, 1), op);
-      n = n + 1;
+      value = band(value, 31) rs = rs - 5; 
+      op = op + value * 2^rs; op = bor(shl(bit_value, 1), op); n = n + 1;
     elseif p == "?" then
-      local value = parse_imm(params[n], 7, 0, 0, false);
-      op = bor(shl(value, 5), op);
-      n = n + 1;
+      local value = parse_imm(params[n], 7, 0, 0, false); op = bor(shl(value, 5), op); n = n + 1;
     elseif p == "i" then
       rs = rs - 5; 
       op = op + parse_vs(params[n], function_modes.lsb5) * 2^rs + parse_vs(params[n], function_modes.msb); 
       n = n + 1;
     elseif p == "n" then
-      local first_register = shr(band(op, 65011712), 21)
-      op = band(op, -65011713) 
+      local first_register = shr(band(op, 65011712), 21);
+      op = band(op, -65011713); 
       op = op + parse_vs(params[n], function_modes.lsb5) * 2^rs + parse_vs(params[n], function_modes.msb); 
       rs = rs - 5; op = op + first_register * 2^rs; 
       n = n + 1;
     elseif p == "L" then 
-      op = op + parse_imm(params[n], 1, 0, 0, false); 
-      n = n + 1;
+      op = op + parse_imm(params[n], 1, 0, 0, false); n = n + 1;
     elseif p == "M" then
-      rs = rs - 5; 
-      op = op + parse_gpr_pair(params[n]) * 2^rs; 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_gpr_pair(params[n]) * 2^rs; n = n + 1;
     elseif p == "H" then
-      rs = rs - 5; 
-      op = op + parse_fpr_pair(params[n]) * 2^rs; 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_fpr_pair(params[n]) * 2^rs; n = n + 1;
     elseif p == "Z" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 4, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 4, rs, 0, false); n = n + 1;
     elseif p == "k" then
-      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 21), op) 
-      rs = rs - 1; 
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 21), op); 
+      rs = rs - 1; n = n + 1;
     elseif p == "p" then
-      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 11), op) 
-      rs = rs - 1; 
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 11), op); 
+      rs = rs - 1; n = n + 1;
     elseif p == "m" then
-      op = bor(shl(parse_imm(params[n], 3, 0, 0, false), 21), op) 
+      op = bor(shl(parse_imm(params[n], 3, 0, 0, false), 21), op); 
       n = n + 1;
     elseif p == "N" then
-      op = bor(shl(1, 10), op) 
-      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 9), op) 
+      op = bor(shl(1, 10), op); 
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 9), op); 
       n = n + 1;
     elseif p == "A" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 5, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, false); n = n + 1;
     elseif p == "}" then
-      rs = rs - 5;
-      op = op + parse_imm(params[n], 5, rs, 0, true);
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, true); n = n + 1;
     elseif p == "h" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 2, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 2, rs, 0, false); n = n + 1;
     elseif p == "S" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 5, rs, 0, true); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, true); n = n + 1;
     elseif p == "I" then
-      op = op + parse_imm(params[n], 16, 0, 0, true); 
-      n = n + 1;
+      op = op + parse_imm(params[n], 16, 0, 0, true); n = n + 1;
     elseif p == "U" then
-      op = op + parse_imm(params[n], 16, 0, 0, false); 
-      n = n + 1;
+      op = op + parse_imm(params[n], 16, 0, 0, false); n = n + 1;
     elseif p == "D" then
-      op = op + parse_disp(params[n]); 
-      n = n + 1;
+      op = op + parse_disp(params[n]); n = n + 1;
     elseif p == "2" then
-      op = op + parse_udisp(params[n], 1); 
-      n = n + 1;
+      op = op + parse_udisp(params[n], 1); n = n + 1;
     elseif p == "4" then
-      op = op + parse_udisp(params[n], 2); 
-      n = n + 1;
+      op = op + parse_udisp(params[n], 2); n = n + 1;
     elseif p == "8" then
-      op = op + parse_udisp(params[n], 3); 
-      n = n + 1;
+      op = op + parse_udisp(params[n], 3); n = n + 1;
     elseif p == "c" then
-      op = op + parse_udisp(params[n], 0, 12); 
-      n = n + 1;
+      op = op + parse_udisp(params[n], 0, 12); n = n + 1;
     elseif p == "<" then 
-      op = op + parse_udisp(params[n], 0, 14);
-      n = n + 1;
+      op = op + parse_udisp(params[n], 0, 14); n = n + 1;
     elseif p == "C" then
-      rs = rs - 5; 
-      op = op + parse_cond(params[n]) * 2^rs; 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_cond(params[n]) * 2^rs; n = n + 1;
     elseif p == "X" then
-      rs = rs - 5; 
-      op = op + parse_cr(params[n]) * 2^(rs+2); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_cr(params[n]) * 2^(rs + 2); n = n + 1;
     elseif p == "W" then
-      op = op + parse_cr(params[n]); 
-      n = n + 1;
+      op = op + parse_cr(params[n]); n = n + 1;
     elseif p == "B" then
-      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 19), op);
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 19), op); n = n + 1;
     elseif p == "t" then
-      op = bor(shl(parse_imm(params[n], 5, 0, 0, false), 16), op);
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 5, 0, 0, false), 16), op); n = n + 1;
     elseif p == "f" then
-      op = bor(shl(parse_imm(params[n], 5, 0, 0, true), 16), op);
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 5, 0, 0, true), 16), op); n = n + 1;
     elseif p == "z" then
-      op = bor(shl(parse_imm(params[n], 8, 0, 0, false), 17), op);
-      rs = rs - 10;
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 8, 0, 0, false), 17), op); rs = rs - 10; n = n + 1;
     elseif p == "w" then
-      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 25), op);
-      n = n + 1
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 25), op); n = n + 1;
     elseif p == "@" then
       local vs_value = parse_vs(params[n]);
       local msb = shr(band(vs_value, 32), 5);
       vs_value = band(vs_value, 31);
-      rs = rs - 5;
-      t_msb = msb;
-      op = op + vs_value * 2^rs + msb;
-      n = n + 1
+      rs = rs - 5; op = op + vs_value * 2^rs + msb; n = n + 1;
     elseif p == "!" then
       local vs_value = parse_vs(params[n]);
       local msb = shr(band(vs_value, 32), 5);
       vs_value = band(vs_value, 31);
-      rs = rs - 5;
-      a_msb = msb;
-      op = op + vs_value * 2^rs + msb * 4;
-      n = n + 1
+      rs = rs - 5; op = op + vs_value * 2^rs + msb * 4; n = n + 1;
     elseif p == "$" then
       local vs_value = parse_vs(params[n]);
       local msb = shr(band(vs_value, 32), 5);
       vs_value = band(vs_value, 31);
-      rs = rs - 5;
-      b_msb = msb;
-      op = op + vs_value * 2^rs + msb * 2;
-      n = n + 1
+      rs = rs - 5; op = op + vs_value * 2^rs + msb * 2; n = n + 1;
     elseif p == "&" then
       local vs_value = parse_vs(params[n]);
       local msb = shr(band(vs_value, 32), 5);
       vs_value = band(vs_value, 31);
-      rs = rs - 5;
-      op = op + vs_value * 2^rs + msb * 8;
-      n = n + 1
+      rs = rs - 5; op = op + vs_value * 2^rs + msb * 8; n = n + 1;
     elseif p == "l" then
-      rs = rs - 3; 
-      op = op + parse_imm(params[n], 2, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 3; op = op + parse_imm(params[n], 2, rs, 0, false); n = n + 1;
     elseif p == "x" then
-      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 16), op);
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 16), op); n = n + 1;
     elseif p == "b" then
-      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 20), op);
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 20), op); n = n + 1;
     elseif p == "j" then
-      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 16), op);
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 16), op); n = n + 1;
     elseif p == "G" then
-      op = op + parse_imm(params[n], 8, 12, 0, false); 
-      n = n + 1;
+      op = op + parse_imm(params[n], 8, 12, 0, false); n = n + 1;
     elseif p == "P" then
-      rs = rs - 4; 
-      op = op + parse_imm(params[n], 4, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 4; op = op + parse_imm(params[n], 4, rs, 0, false); n = n + 1;
     elseif p == "T" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 5, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, false); n = n + 1;
     elseif p == "q" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 5, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, false); n = n + 1;
     elseif p == "y" then
       local vb_value = shr(band(op, 2031616), 16);
       op = band(op, 4292935679);
       op = op + parse_imm(params[n], 5, 0, 0, false) * 2^rs;  
-      op = bor(shl(vb_value, 11), op);
-      n = n + 1;
+      op = bor(shl(vb_value, 11), op); n = n + 1;
     elseif p == "a" then
       local vb_value = shr(band(op, 2031616), 16);
       op = band(op, 4292935679);
       op = op + parse_imm(params[n], 3, 0, 0, false) * 2^rs;  
-      op = bor(shl(vb_value, 11), op);
-      n = n + 1;
+      op = bor(shl(vb_value, 11), op); n = n + 1;
     elseif p == "Q" then
-      rs = rs - 10; 
-      op = op + parse_10bit_field(params[n]) * 2^rs; 
-      n = n + 1;
+      rs = rs - 10; op = op + parse_10bit_field(params[n]) * 2^rs; n = n + 1;
     elseif p == "*" then
-      rs = rs - 10;
-      op = op + parse_10bit_field(params[n], function_modes.split_10bit) * 2^rs;
-      n = n + 1;
+      rs = rs - 10; op = op + parse_10bit_field(params[n], function_modes.split_10bit) * 2^rs; n = n + 1;
     elseif p == "s" then
-      rs = rs - 1; 
-      op = op + parse_imm(params[n], 1, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 1;  op = op + parse_imm(params[n], 1, rs, 0, false);  n = n + 1;
     elseif p == "e" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 2, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 2, rs, 0, false); n = n + 1;
     elseif p == "g" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 1, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 1, rs, 0, false); n = n + 1;
     elseif p == "]" then
-      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 21), op);
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 21), op); n = n + 1;
     elseif p == "[" then
-      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 15), op);
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 15), op); n = n + 1;
     elseif p == "Y" then 
-      rs = rs - 2; 
-      op = op + parse_imm(params[n], 2, rs, 0, false);
-      n = n + 1;
+      rs = rs - 2; op = op + parse_imm(params[n], 2, rs, 0, false); n = n + 1;
     elseif p == "(" then
-      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 16), op);
-      n = n + 1;
+      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 16), op); n = n + 1;
     elseif p == "r" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 2, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 2, rs, 0, false); n = n + 1;
     elseif p == "O" then
-      rs = rs - 15; 
-      op = op + parse_imm(params[n], 15, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 15; op = op + parse_imm(params[n], 15, rs, 0, false); n = n + 1;
     elseif p == "E" then
-      rs = rs - 1; 
-      op = op + 1 * 2^rs; 
-      rs = rs - 8; 
-      op = op + parse_imm(params[n], 8, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 1; op = op + 1 * 2^rs; rs = rs - 8; 
+      op = op + parse_imm(params[n], 8, rs, 0, false); n = n + 1;
     elseif p == "/" then
-      local value = parse_imm(params[n], 8, 0, 0, false);
-      op = bor(op, shl(value, 12));
-      n = n + 1;
+      local value = parse_imm(params[n], 8, 0, 0, false); op = bor(op, shl(value, 12)); n = n + 1;
     elseif p == "|" then
-      local value = parse_10bit_field(params[n], function_modes.split_10bit);
-      op = bor(op, shl(value, 11));
-      n = n + 1;
+      local value = parse_10bit_field(params[n], function_modes.split_10bit); op = bor(op, shl(value, 11)); n = n + 1;
     elseif p == "u" then
-      rs = rs - 5; 
-      op = op + parse_imm(params[n], 6, rs, 0, false); 
-      n = n + 1;
+      rs = rs - 5; op = op + parse_imm(params[n], 6, rs, 0, false); n = n + 1;
     elseif p == "{" then
-     rs = rs - 6;
-     op = op + parse_imm(params[n], 6, rs, 0, false);
-     n = n + 1;
+     rs = rs - 6; op = op + parse_imm(params[n], 6, rs, 0, false); n = n + 1;
     elseif p == "d" then
-      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 16), op) 
-      n = n + 1
+      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 16), op); n = n + 1
     elseif p == "J" or p == "K" then
       local mode, n, s = parse_label(params[n], false)
       if p == "K" then n = n + 2048 end
@@ -2061,40 +1954,6 @@ map_op[".template__"] = function(params, template, nparams)
       local t2h = (t1h - t2l) / 32
       local t3l = t2h % 32
       op = ((t2h - t3l + t2l)*32 + t3l)*mm + t1l
-    elseif p == "+" then
-           local pos_b, bit_b, pos_a, bit_a, pos_t, bit_t;          
-           if string.sub(template, #template, #template) ~= "x" then
-              pos_b = tonumber(string.sub(template, #template, #template));
-              bit_b = b_msb;
-              op = band(op, bnot(shl(1, pos_b)));
-
-           end
-           
-           if string.sub(template, #template - 1, #template - 1) ~= "x" then
-              pos_a = tonumber(string.sub(template, #template - 1, #template - 1));
-              bit_a = a_msb;
-              op = band(op, bnot(shl(1, pos_a)));
-           end
-           
-           if string.sub(template, #template - 2, #template - 2) ~= "x" then
-              pos_t = tonumber(string.sub(template, #template - 2, #template - 2));
-              bit_t = t_msb;
-              op = band(op, bnot(shl(1, pos_t)));
-           end 
-
-           if string.sub(template, #template, #template) ~= "x" then
-              op = bor(shl(bit_b, pos_b), op);
-           end
-           
-           if string.sub(template, #template - 1, #template - 1) ~= "x" then
-              op = bor(shl(bit_a, pos_a), op);
-           end
-           
-           if string.sub(template, #template - 2, #template - 2) ~= "x" then
-               op = bor(shl(bit_t, pos_t), op);
-           end 
-           
-           break
     elseif p == "-" then
       rs = rs - 5
     elseif p == ":" then
