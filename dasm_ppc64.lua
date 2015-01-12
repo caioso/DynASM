@@ -1426,7 +1426,7 @@ local map_op = {
   stfdp_2 =		"f4000000HD",
 
   -- Primary Opcode 62
-  stq_2 =		"F8000002Mc",
+  stq_2 =		"F8000002M<",
 
   -- Primary Opcode 63
   daddq_3 =		"fc000004HHH.",
@@ -1673,7 +1673,7 @@ local function parse_10bit_field(expr, type)
       return bor(shl(band(r, 31), 5), shr(band(r, 992), 5));
     end 
   end
-  werror("bad field value (must be within [0, 1023] `"..expr.."'")
+  werror("out of range immediate `"..expr.."'")
 end
 
 -- Parse Displacements
@@ -1696,34 +1696,16 @@ local function parse_disp(disp)
   werror("bad displacement `"..disp.."'")
 end
 
--- Parse U5 Displacement
-local function parse_u5disp(disp, scale)
+-- Parse U Displacement
+local function parse_udisp(disp, scale, size)
   local imm, reg = match(disp, "^(.*)%(([%w_:]+)%)$")
+  if size == nil then size = 5 end
   if imm then
     local r = parse_gpr(reg)
     if r == 0 then werror("cannot use r0 in displacement") end
-    return r*65536 + parse_imm(imm, 5, 11, scale, false)
-  end
-  local reg, tailr = match(disp, "^([%w_:]+)%s*(.*)$")
-  if reg and tailr ~= "" then
-    local r, tp = parse_gpr(reg)
-    if r == 0 then werror("cannot use r0 in displacement") end
-    if tp then
-      waction("IMM", scale*1024+5*32+11, format(tp.ctypefmt, tailr))
-      return r*65536
-    end
-  end
-  werror("bad displacement `"..disp.."'")
-end
-
--- Parse U14 Displacement
-local function parse_u14disp(disp, scale)
-local imm, reg = match(disp, "^(.*)%(([%w_:]+)%)$")
-  if imm then
-    local r = parse_gpr(reg)
-    --werror(r .. " " .. imm)
-    if r == 0 then werror("cannot use r0 in displacement") end
-    return r*65536 + parse_imm(imm, 14, 2, scale, true)
+    if size == 5 then  return r*65536 + parse_imm(imm, 5, 11, scale, false) 
+    elseif size == 12 then return r*65536 + parse_imm(imm, 12, 0, scale, true);
+    elseif size == 14 then return r*65536 + parse_imm(imm, 14, 0, scale, true); end
   end
   local reg, tailr = match(disp, "^([%w_:]+)%s*(.*)$")
   if reg and tailr ~= "" then
@@ -1798,7 +1780,7 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1;
     elseif p == "v" then
       rs = rs - 5; 
-      op = op + parse_imm(params[n], 6, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 6, rs, 0, false); 
       n = n + 1
     elseif p == "o" then
       local value = parse_imm(params[n], 6, 0, 0, false)
@@ -1834,7 +1816,7 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1;
     elseif p == "Z" then
       rs = rs - 5; 
-      op = op + parse_imm(params[n], 4, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 4, rs, 0, false); 
       n = n + 1;
     elseif p == "k" then
       op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 21), op) 
@@ -1861,7 +1843,7 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1;
     elseif p == "h" then
       rs = rs - 5; 
-      op = op + parse_imm(params[n], 2, 0, 0, false)* 2^rs; 
+      op = op + parse_imm(params[n], 2, rs, 0, false); 
       n = n + 1;
     elseif p == "S" then
       rs = rs - 5; 
@@ -1877,16 +1859,19 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + parse_disp(params[n]); 
       n = n + 1;
     elseif p == "2" then
-      op = op + parse_u5disp(params[n], 1); 
+      op = op + parse_udisp(params[n], 1); 
       n = n + 1;
     elseif p == "4" then
-      op = op + parse_u5disp(params[n], 2); 
+      op = op + parse_udisp(params[n], 2); 
       n = n + 1;
     elseif p == "8" then
-      op = op + parse_u5disp(params[n], 3); 
+      op = op + parse_udisp(params[n], 3); 
       n = n + 1;
     elseif p == "c" then
-      op = op + parse_u14disp(params[n], 2); 
+      op = op + parse_udisp(params[n], 0, 12); 
+      n = n + 1;
+    elseif p == "<" then 
+      op = op + parse_udisp(params[n], 0, 14);
       n = n + 1;
     elseif p == "C" then
       rs = rs - 5; 
@@ -1949,7 +1934,7 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1
     elseif p == "l" then
       rs = rs - 3; 
-      op = op + parse_imm(params[n], 2, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 2, rs, 0, false); 
       n = n + 1;
     elseif p == "x" then
       op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 16), op);
@@ -1965,15 +1950,15 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1;
     elseif p == "P" then
       rs = rs - 4; 
-      op = op + parse_imm(params[n], 4, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 4, rs, 0, false); 
       n = n + 1;
     elseif p == "T" then
       rs = rs - 5; 
-      op = op + parse_imm(params[n], 5, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 5, rs, 0, false); 
       n = n + 1;
     elseif p == "q" then
       rs = rs - 5; 
-      op = op + parse_imm(params[n], 5, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 5, rs, 0, false); 
       n = n + 1;
     elseif p == "y" then
       local vb_value = shr(band(op, 2031616), 16);
@@ -1997,15 +1982,15 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1;
     elseif p == "s" then
       rs = rs - 1; 
-      op = op + parse_imm(params[n], 1, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 1, rs, 0, false); 
       n = n + 1;
     elseif p == "e" then
       rs = rs - 5; 
-      op = op + parse_imm(params[n], 2, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 2, rs, 0, false); 
       n = n + 1;
     elseif p == "g" then
       rs = rs - 5; 
-      op = op + parse_imm(params[n], 1, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 1, rs, 0, false); 
       n = n + 1;
     elseif p == "]" then
       op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 21), op);
@@ -2015,24 +2000,24 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1;
     elseif p == "Y" then 
       rs = rs - 2; 
-      op = op + parse_imm(params[n], 2, 0, 0, false) * 2^rs;
+      op = op + parse_imm(params[n], 2, rs, 0, false);
       n = n + 1;
     elseif p == "(" then
       op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 16), op);
       n = n + 1;
     elseif p == "r" then
       rs = rs - 5; 
-      op = op + parse_imm(params[n], 2, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 2, rs, 0, false); 
       n = n + 1;
     elseif p == "O" then
       rs = rs - 15; 
-      op = op + parse_imm(params[n], 15, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 15, rs, 0, false); 
       n = n + 1;
     elseif p == "E" then
       rs = rs - 1; 
       op = op + 1 * 2^rs; 
       rs = rs - 8; 
-      op = op + parse_imm(params[n], 8, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 8, rs, 0, false); 
       n = n + 1;
     elseif p == "/" then
       local value = parse_imm(params[n], 8, 0, 0, false);
@@ -2044,11 +2029,11 @@ map_op[".template__"] = function(params, template, nparams)
       n = n + 1;
     elseif p == "u" then
       rs = rs - 5; 
-      op = op + parse_imm(params[n], 6, 0, 0, false) * 2^rs; 
+      op = op + parse_imm(params[n], 6, rs, 0, false); 
       n = n + 1;
     elseif p == "{" then
      rs = rs - 6;
-     op = op + parse_imm(params[n], 6, 0, 0, false) * 2^rs;
+     op = op + parse_imm(params[n], 6, rs, 0, false);
      n = n + 1;
     elseif p == "d" then
       op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 16), op) 
@@ -2289,5 +2274,3 @@ end
 return _M
 
 ------------------------------------------------------------------------------
-
-
