@@ -1262,165 +1262,164 @@ local map_op = {
   fcfidus_2 =		"ec00079cF-F.",
 
   -- Primary Opcode 60
-  xsaddsp_3 =		"f0000000@!$+021",
-  xsmaddasp_3 =		"f0000008@!$+021",
-  xxsldwi_4 =		"f0000010@!$l+021",
-  xsrsqrtesp_2 =	"f0000028@-$+0x1",
-  xssqrtsp_2 =		"f000002c@-$+0x1",
-  xxsel_4 =		"f0000030@!$&+021", 
-  xssubsp_3 =		"f0000040@!$+021",
-  xsmaddmsp_3 =		"f0000048@!$+021",
-  xxpermdi_4 =		"f0000050@!$l+021",
-  xsresp_2 =		"f0000068@-$+0x1", 
-  xsmulsp_3 =		"f0000080@!$+021",
-  xsmsubasp_3 =		"f0000088@!$+021",
-  xxmrghw_3 =		"f0000090@!$+021",
-  xsdivsp_3 =		"f00000c0@!$+021",
-  xsmsubmsp_3 =		"f00000c8@!$+021",
-  xsadddp_3 =		"f0000100@!$+021",
-  xsmaddadp_3 =		"f0000108@!$+021",
-  xscmpudp_3 =		"f0000118X!$+x21",
-  xscvdpuxws_2 =	"f0000120@-$+0x1",
-  xsrdpi_2 =		"f0000124@-$+0x1",
-  xsrsqrtedp_2 =	"f0000128@-$+0x1",
-  xssqrtdp_2 =		"f000012c@-$+0x1",
-  xssubdp_3 =		"f0000140@!$+021",
-  xsmaddmdp_3 =		"f0000148@!$+021",
-  xscmpodp_3 =		"f0000158X!$+x21",
-  xscvdpsxws_2 =	"f0000160@-$+0x1",
-  xsrdpiz_2 =		"f0000164@-$+0x1",
-  xsredp_2 =		"f0000168@-$+0x1",
-  xsmuldp_3 =		"f0000180@!$+021",
-  xsmsubadp_3 =		"f0000188@!$+021",
-  xxmrglw_3 =		"f0000190@!$+021",
-  xsrdpip_2 =		"f00001a4@-$+0x1",
-  xstsqrtdp_2 =		"f00001a8X-$+xx1",
-  xsrdpic_2 =		"f00001ac@-$+0x1",
-  xsdivdp_3 =		"f00001c0@!$+021",
-  xsmsubmdp_3 =		"f00001c8@!$+021",
-  xsrdpim_2 =		"f00001e4@-$+0x1", 
-  xstdivdp_3 =		"f00001e8X!$+x21",
-  xvaddsp_3 =		"f0000200@!$+021",
-  xvmaddasp_3 =		"f0000208@!$+021",
-  xvcmpeqsp_3 =		"f0000218@!$+021",
-  xvcvspuxws_2 =	"f0000220@-$+0x1",
-  xvrspi_2 =		"f0000224@-$+0x1",
-  xvrsqrtesp_2 =	"f0000228@-$+0x1",
-  xvsqrtsp_2 =		"f000022c@-$+0x1",
-  xvsubsp_3 =		"f0000240@!$+021",
-  xvmaddmsp_3 =		"f0000248@!$+021",
-  xvcmpgtsp_3 =		"f0000258@!$+021",
-  xvcvspsxws_2 =	"f0000260@-$+0x1",
-  xvrspiz_2 =		"f0000264@-$+0x1",
-  xvrspiz_2 =		"f0000264@-$+0x1",
-  xvresp_2 =		"f0000268@-$+0x1",
-  xvmulsp_3 =		"f0000280@!$+021",
-  xvmsubasp_3 =		"f0000288@!$+021",
-  xxspltw_3 =		"f0000290@-$(+1x0",
-  xvcmpgesp_3 =		"f0000298@!$+021",
-  xvcvuxwsp_2 =		"f00002a0@-$+0x1",
-  xvrspip_2 =		"f00002a4@-$+0x1",
-  xvtsqrtsp_2 =		"f00002a8X-$+xx1",
-  xvrspic_2 =		"f00002ac@-$+0x1",
-  xvdivsp_3 =		"f00002c0@!$+021",
-  xvmsubmsp_3 =		"f00002c8@!$+021",
-  xvcvsxwsp_2 =		"f00002e0@-$+0x1",
-  xvrspim_2 =		"f00002e4@-$+0x1",
-  xvtdivsp_3 =		"f00002e8X!$+x21",
-  xvadddp_3 =		"f0000300@!$+021",
-  xvmaddadp_3 =		"f0000308@!$+021",
-  xvcmpeqdp_3 =		"f0000318@!$+021",
-  xvcvdpuxws_2 =	"f0000320@-$+0x1",
-  xvrdpi_2 =		"f0000324@-$+0x1",
-  xvrsqrtedp_2 =	"f0000328@-$+0x1",
-  xvsqrtdp_2 =		"f000032c@-$+0x1",
-  xvsubdp_3 =		"f0000340@!$+021",
-  xvmaddmdp_3 =		"f0000348@!$+021",
-  xvcmpgtdp_3 =		"f0000358@!$+021",
-  xvcvdpsxws_2 =	"f0000360@-$+0x1",
-  xvrdpiz_2 =		"f0000364@-$+0x1",
-  xvredp_2 =		"f0000368@-$+0x1",
-  xvmuldp_3 =		"f0000380@!$+021",
-  xvmsubadp_3 =		"f0000388@!$+021", 
-  xvcmpgedp_3 =		"f0000398@!$+021",
-  xvcvuxwdp_2 =		"f00003a0@-$+0x1",
-  xvrdpip_2 =		"f00003a4@-$+0x1",
-  xvtsqrtdp_2 =		"f00003a8X-$+xx1",
-  xvrdpic_2 =		"f00003ac@-$+0x1",
-  xvdivdp_3 =		"f00003c0@!$+021",
-  xvmsubmdp_3 =		"f00003c8@!$+021",
-  xvcvsxwdp_2 =		"f00003e0@-$+0x1",
-  xvrdpim_2 =		"f00003e4@-$+0x1",
-  xvtdivdp_3 =		"f00003e8X!$+x21",
-  xsnmaddasp_3 =	"f0000408@!$+021",
-  xxland_3 =		"f0000410@!$+021",
-  xscvdpsp_2 =		"f0000424@-$+0x1",
-  xscvdpspn_2 =		"f000042c@-$+0x1",
-  xsnmaddmsp_3 =	"f0000448@!$+021",
-  xxlandc_3 =		"f0000450@!$+021",
-  xsrsp_2 =		"f0000464@-$+0x1",
-  xsnmsubasp_3 =	"f0000488@!$+021",
-  xxlor_3 =		"f0000490@!$+021",
-  xscvuxdsp_2 =		"f00004a0@-$+0x1",
-  xsnmsubmsp_3 =	"f00004c8@!$+021",
-  xxlxor_3 =		"f00004d0@!$+021",
-  xscvsxdsp_2 =		"f00004e0@-$+0x1",
-  xsmaxdp_3 =		"f0000500@!$+021",
-  xsnmaddadp_3 =	"f0000508@!$+021",
-  xxlnor_3 =		"f0000510@!$+021",
-  xscvdpuxds_2 =	"f0000520@-$+0x1",
-  xscvspdp_2 =		"f0000524@-$+0x1",
-  xscvspdpn_2 =		"f000052c@-$+0x1",
-  xsmindp_3 =		"f0000540@!$+021",
-  xsnmaddmdp_3 =	"f0000548@!$+021",
-  xxlorc_3 =		"f0000550@!$+021",
-  xscvdpsxds_2 =	"f0000560@-$+0x1",
-  xsabsdp_2 =		"f0000564@-$+1x0",
-  xscpsgndp_3 =		"f0000580@!$+021",
-  xsnmsubadp_3 =	"f0000588@!$+021",
-  xxlnand_3 =		"f0000590@!$+021",
-  xscvuxddp_2 =		"f00005a0@-$+0x1",
-  xsnabsdp_2 =		"f00005a4@-$+0x1",
-  xsnmsubmdp_3 =	"f00005c8@!$+021",
-  xxleqv_3 =		"f00005d0@!$+021",
-  xscvsxddp_2 =		"f00005e0@-$+0x1",
-  xsnegdp_2 =		"f00005e4@-$+0x1",
-  xvmaxsp_3 =		"f0000600@!$+021",
-  xvnmaddasp_3 =	"f0000608@!$+021",
-  ["xvcmpeqsp._3"] =	"f0000618@!$+021",
-  xvcvspuxds_2 =	"f0000620@-$+0x1",
-  xvcvdpsp_2 =		"f0000624@-$+0x1",
-  xvminsp_3 =		"f0000640@!$+021",
-  xvnmaddmsp_3 =	"f0000648@!$+021",
-  ["xvcmpgtsp._3"] =	"f0000658@!$+021",
-  xvcvspsxds_2 =	"f0000660@-$+0x1",
-  xvabssp_2 =		"f0000664@-$+0x1",
-  xvcpsgnsp_3 =		"f0000680@!$+021",
-  xvnmsubasp_3 =	"f0000688@!$+021",
-  ["xvcmpgesp._3"] =	"f0000698@!$+021",
-  xvcvuxdsp_2 =		"f00006a0@-$+0x1",
-  xvnabssp_2 =		"f00006a4@-$+0x1",
-  xvnmsubmsp_3 =	"f00006c8@!$+021",
-  xvcvsxdsp_2 =		"f00006e0@-$+0x1",
-  xvnegsp_2 =		"f00006e4@-$+0x1",
-  xvmaxdp_3 =		"f0000700@!$+021",
-  xvnmaddadp_3 =	"f0000708@!$+021",
-  ["xvcmpeqdp._3"] =	"f0000718@!$+021",
-  xvcvdpuxds_2 =	"f0000720@-$+0x1",
-  xvcvspdp_2 =		"f0000724@-$+0x1",
-  xvmindp_3 =		"f0000740@!$+021",
-  xvnmaddmdp_3 =	"f0000748@!$+021",
-  ["xvcmpgtdp._3"] =	"f0000758@!$+021",
-  xvcvdpsxds_2 =	"f0000760@-$+0x1",
-  xvabsdp_2 =		"f0000764@-$+0x1",
-  xvcpsgndp_3 =		"f0000780@!$+021",
-  xvnmsubadp_3 =	"f0000788@!$+021",
-  ["xvcmpgedp._3"] =	"f0000798@!$+021",
-  xvcvuxddp_2 =		"f00007a0@-$+0x1",
-  xvnabsdp_2 =		"f00007a4@-$+0x1",
-  xvnmsubmdp_3 =	"f00007c8@!$+021",
-  xvcvsxddp_2 =		"f00007e0@-$+0x1",
-  xvnegdp_2 =		"f00007e4@-$+0x1",
+  xsaddsp_3 =		"f0000000@!$",
+  xsmaddasp_3 =		"f0000008@!$",
+  xxsldwi_4 =		"f0000010@!$l",
+  xsrsqrtesp_2 =	"f0000028@-$",
+  xssqrtsp_2 =		"f000002c@-$",
+  xxsel_4 =		"f0000030@!$&", 
+  xssubsp_3 =		"f0000040@!$",
+  xsmaddmsp_3 =		"f0000048@!$",
+  xxpermdi_4 =		"f0000050@!$l",
+  xsresp_2 =		"f0000068@-$", 
+  xsmulsp_3 =		"f0000080@!$",
+  xsmsubasp_3 =		"f0000088@!$",
+  xxmrghw_3 =		"f0000090@!$",
+  xsdivsp_3 =		"f00000c0@!$",
+  xsmsubmsp_3 =		"f00000c8@!$",
+  xsadddp_3 =		"f0000100@!$",
+  xsmaddadp_3 =		"f0000108@!$",
+  xscmpudp_3 =		"f0000118X!$",
+  xscvdpuxws_2 =	"f0000120@-$",
+  xsrdpi_2 =		"f0000124@-$",
+  xsrsqrtedp_2 =	"f0000128@-$",
+  xssqrtdp_2 =		"f000012c@-$",
+  xssubdp_3 =		"f0000140@!$",
+  xsmaddmdp_3 =		"f0000148@!$",
+  xscmpodp_3 =		"f0000158X!$",
+  xscvdpsxws_2 =	"f0000160@-$",
+  xsrdpiz_2 =		"f0000164@-$",
+  xsredp_2 =		"f0000168@-$",
+  xsmuldp_3 =		"f0000180@!$",
+  xsmsubadp_3 =		"f0000188@!$",
+  xxmrglw_3 =		"f0000190@!$",
+  xsrdpip_2 =		"f00001a4@-$",
+  xstsqrtdp_2 =		"f00001a8X-$",
+  xsrdpic_2 =		"f00001ac@-$",
+  xsdivdp_3 =		"f00001c0@!$",
+  xsmsubmdp_3 =		"f00001c8@!$",
+  xsrdpim_2 =		"f00001e4@-$", 
+  xstdivdp_3 =		"f00001e8X!$",
+  xvaddsp_3 =		"f0000200@!$",
+  xvmaddasp_3 =		"f0000208@!$",
+  xvcmpeqsp_3 =		"f0000218@!$", 
+  xvcvspuxws_2 =	"f0000220@-$",
+  xvrspi_2 =		"f0000224@-$",
+  xvrsqrtesp_2 =	"f0000228@-$",
+  xvsqrtsp_2 =		"f000022c@-$",
+  xvsubsp_3 =		"f0000240@!$",
+  xvmaddmsp_3 =		"f0000248@!$",
+  xvcmpgtsp_3 =		"f0000258@!$",
+  xvcvspsxws_2 =	"f0000260@-$",
+  xvrspiz_2 =		"f0000264@-$",
+  xvresp_2 =		"f0000268@-$",
+  xvmulsp_3 =		"f0000280@!$",
+  xvmsubasp_3 =		"f0000288@!$",
+  xxspltw_3 =		"f0000290@-$(",
+  xvcmpgesp_3 =		"f0000298@!$",
+  xvcvuxwsp_2 =		"f00002a0@-$",
+  xvrspip_2 =		"f00002a4@-$",
+  xvtsqrtsp_2 =		"f00002a8X-$",
+  xvrspic_2 =		"f00002ac@-$",
+  xvdivsp_3 =		"f00002c0@!$",
+  xvmsubmsp_3 =		"f00002c8@!$",
+  xvcvsxwsp_2 =		"f00002e0@-$",
+  xvrspim_2 =		"f00002e4@-$",
+  xvtdivsp_3 =		"f00002e8X!$",
+  xvadddp_3 =		"f0000300@!$",
+  xvmaddadp_3 =		"f0000308@!$",
+  xvcmpeqdp_3 =		"f0000318@!$",
+  xvcvdpuxws_2 =	"f0000320@-$",
+  xvrdpi_2 =		"f0000324@-$",
+  xvrsqrtedp_2 =	"f0000328@-$",
+  xvsqrtdp_2 =		"f000032c@-$",
+  xvsubdp_3 =		"f0000340@!$",
+  xvmaddmdp_3 =		"f0000348@!$",
+  xvcmpgtdp_3 =		"f0000358@!$",
+  xvcvdpsxws_2 =	"f0000360@-$",
+  xvrdpiz_2 =		"f0000364@-$",
+  xvredp_2 =		"f0000368@-$",
+  xvmuldp_3 =		"f0000380@!$",
+  xvmsubadp_3 =		"f0000388@!$", 
+  xvcmpgedp_3 =		"f0000398@!$",
+  xvcvuxwdp_2 =		"f00003a0@-$",
+  xvrdpip_2 =		"f00003a4@-$",
+  xvtsqrtdp_2 =		"f00003a8X-$",
+  xvrdpic_2 =		"f00003ac@-$",
+  xvdivdp_3 =		"f00003c0@!$",
+  xvmsubmdp_3 =		"f00003c8@!$",
+  xvcvsxwdp_2 =		"f00003e0@-$",
+  xvrdpim_2 =		"f00003e4@-$",
+  xvtdivdp_3 =		"f00003e8X!$",
+  xsnmaddasp_3 =	"f0000408@!$",
+  xxland_3 =		"f0000410@!$",
+  xscvdpsp_2 =		"f0000424@-$",
+  xscvdpspn_2 =		"f000042c@-$",
+  xsnmaddmsp_3 =	"f0000448@!$",
+  xxlandc_3 =		"f0000450@!$",
+  xsrsp_2 =		"f0000464@-$",
+  xsnmsubasp_3 =	"f0000488@!$",
+  xxlor_3 =		"f0000490@!$",
+  xscvuxdsp_2 =		"f00004a0@-$",
+  xsnmsubmsp_3 =	"f00004c8@!$",
+  xxlxor_3 =		"f00004d0@!$",
+  xscvsxdsp_2 =		"f00004e0@-$",
+  xsmaxdp_3 =		"f0000500@!$",
+  xsnmaddadp_3 =	"f0000508@!$",
+  xxlnor_3 =		"f0000510@!$",
+  xscvdpuxds_2 =	"f0000520@-$",
+  xscvspdp_2 =		"f0000524@-$",
+  xscvspdpn_2 =		"f000052c@-$",
+  xsmindp_3 =		"f0000540@!$",
+  xsnmaddmdp_3 =	"f0000548@!$",
+  xxlorc_3 =		"f0000550@!$",
+  xscvdpsxds_2 =	"f0000560@-$",
+  xsabsdp_2 =		"f0000564@-$",
+  xscpsgndp_3 =		"f0000580@!$",
+  xsnmsubadp_3 =	"f0000588@!$",
+  xxlnand_3 =		"f0000590@!$",
+  xscvuxddp_2 =		"f00005a0@-$",
+  xsnabsdp_2 =		"f00005a4@-$",
+  xsnmsubmdp_3 =	"f00005c8@!$",
+  xxleqv_3 =		"f00005d0@!$",
+  xscvsxddp_2 =		"f00005e0@-$",
+  xsnegdp_2 =		"f00005e4@-$",
+  xvmaxsp_3 =		"f0000600@!$",
+  xvnmaddasp_3 =	"f0000608@!$",
+  ["xvcmpeqsp._3"] =	"f0000618@!$",
+  xvcvspuxds_2 =	"f0000620@-$",
+  xvcvdpsp_2 =		"f0000624@-$",
+  xvminsp_3 =		"f0000640@!$",
+  xvnmaddmsp_3 =	"f0000648@!$",
+  ["xvcmpgtsp._3"] =	"f0000658@!$",
+  xvcvspsxds_2 =	"f0000660@-$",
+  xvabssp_2 =		"f0000664@-$",
+  xvcpsgnsp_3 =		"f0000680@!$",
+  xvnmsubasp_3 =	"f0000688@!$",
+  ["xvcmpgesp._3"] =	"f0000698@!$",
+  xvcvuxdsp_2 =		"f00006a0@-$",
+  xvnabssp_2 =		"f00006a4@-$",
+  xvnmsubmsp_3 =	"f00006c8@!$",
+  xvcvsxdsp_2 =		"f00006e0@-$",
+  xvnegsp_2 =		"f00006e4@-$",
+  xvmaxdp_3 =		"f0000700@!$",
+  xvnmaddadp_3 =	"f0000708@!$",
+  ["xvcmpeqdp._3"] =	"f0000718@!$",
+  xvcvdpuxds_2 =	"f0000720@-$",
+  xvcvspdp_2 =		"f0000724@-$",
+  xvmindp_3 =		"f0000740@!$",
+  xvnmaddmdp_3 =	"f0000748@!$",
+  ["xvcmpgtdp._3"] =	"f0000758@!$",
+  xvcvdpsxds_2 =	"f0000760@-$",
+  xvabsdp_2 =		"f0000764@-$",
+  xvcpsgndp_3 =		"f0000780@!$",
+  xvnmsubadp_3 =	"f0000788@!$",
+  ["xvcmpgedp._3"] =	"f0000798@!$",
+  xvcvuxddp_2 =		"f00007a0@-$",
+  xvnabsdp_2 =		"f00007a4@-$",
+  xvnmsubmdp_3 =	"f00007c8@!$",
+  xvcvsxddp_2 =		"f00007e0@-$",
+  xvnegdp_2 =		"f00007e4@-$",
 
   -- Primary Opcode 61  
   stfdp_2 =		"f4000000HD",
@@ -1648,12 +1647,12 @@ local function parse_imm(imm, bits, shift, scale, signed)
     end
     werror("out of range immediate `"..imm.."'")
   elseif match(imm, "^r([1-3]?[0-9])$") or
-	match(imm, "^([%w_]+):(r[1-3]?[0-9])$") or 
-   match(imm, "^f([1-3]?[0-9])$") or
+	 match(imm, "^([%w_]+):(r[1-3]?[0-9])$") or 
+         match(imm, "^f([1-3]?[0-9])$") or
 	 match(imm, "^([%w_]+):(f[1-3]?[0-9])$") or 
-   match(imm, "^v([1-3]?[0-9])$") or
+         match(imm, "^v([1-3]?[0-9])$") or
 	 match(imm, "^([%w_]+):(v[1-3]?[0-9])$") or
-   match(imm, "^vs([1-3]?[0-9])$") or
+         match(imm, "^vs([1-3]?[0-9])$") or
 	 match(imm, "^([%w_]+):(vs[1-3]?[0-9])$") then
     werror("expected immediate operand, got register")
   else
@@ -1666,6 +1665,7 @@ end
 local function parse_10bit_field(expr, type)
   if type == nil then type = 0 end
   local r = parse_imm(expr, 10, 0, 0, false)
+  if r then
   if r <= 1023 and r >= 0 then
     if type == 0 then
       return r 
@@ -1674,6 +1674,8 @@ local function parse_10bit_field(expr, type)
     end 
   end
   werror("out of range immediate `"..expr.."'")
+  end
+  werror("Invalid immediate Â´`"..expr.."'")
 end
 
 -- Parse Displacements
@@ -1681,7 +1683,7 @@ local function parse_disp(disp)
   local imm, reg = match(disp, "^(.*)%(([%w_:]+)%)$")
   if imm then
     local r = parse_gpr(reg)
-    if r == 0 then werror("cannot use r0 in displacement") end
+  if r == 0 then werror("cannot use r0 in displacement") end
     return r*65536 + parse_imm(imm, 16, 0, 0, true)
   end
   local reg, tailr = match(disp, "^([%w_:]+)%s*(.*)$")
@@ -1906,7 +1908,7 @@ map_op[".template__"] = function(params, template, nparams)
       vs_value = band(vs_value, 31);
       rs = rs - 5;
       t_msb = msb;
-      op = op + vs_value* 2^rs;
+      op = op + vs_value * 2^rs + msb;
       n = n + 1
     elseif p == "!" then
       local vs_value = parse_vs(params[n]);
@@ -1914,23 +1916,22 @@ map_op[".template__"] = function(params, template, nparams)
       vs_value = band(vs_value, 31);
       rs = rs - 5;
       a_msb = msb;
-      op = op + vs_value* 2^rs;
+      op = op + vs_value * 2^rs + msb * 4;
       n = n + 1
     elseif p == "$" then
       local vs_value = parse_vs(params[n]);
       local msb = shr(band(vs_value, 32), 5);
       vs_value = band(vs_value, 31);
       rs = rs - 5;
-     b_msb = msb;
-      op = op + vs_value* 2^rs;
+      b_msb = msb;
+      op = op + vs_value * 2^rs + msb * 2;
       n = n + 1
     elseif p == "&" then
       local vs_value = parse_vs(params[n]);
       local msb = shr(band(vs_value, 32), 5);
       vs_value = band(vs_value, 31);
       rs = rs - 5;
-      op = op + vs_value* 2^rs;
-      op = bor(shl(msb, 3), op);
+      op = op + vs_value * 2^rs + msb * 8;
       n = n + 1
     elseif p == "l" then
       rs = rs - 3; 
