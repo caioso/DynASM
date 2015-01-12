@@ -1,14 +1,18 @@
-------------------------------------------------------------------------------
--- DynASM PPC module.
+----------------------------------------------------------------------------
+-- DynASM PPC64 module.
 --
--- Copyright (C) 2005-2014 Mike Pall. All rights reserved.
+-- Copyright (C) 2005-2015 Mike Pall. All rights reserved.
 -- See dynasm.lua for full copyright notice.
 ------------------------------------------------------------------------------
 
+--to be in ppc64.lua
+local ppc64 = ppc64
+--to be in ppc64.lua
+
 -- Module information:
 local _info = {
-  arch =	"ppc",
-  description =	"DynASM PPC module",
+  arch =	"ppc64",
+  description =	"DynASM PPC64 module",
   version =	"1.3.0",
   vernum =	 10300,
   release =	"2011-05-05",
@@ -26,13 +30,13 @@ local _s = string
 local sub, format, byte, char = _s.sub, _s.format, _s.byte, _s.char
 local match, gmatch = _s.match, _s.gmatch
 local concat, sort = table.concat, table.sort
-local bit = bit or require("bit")
-local band, shl, shr, sar = bit.band, bit.lshift, bit.rshift, bit.arshift
-local tohex = bit.tohex
 
 -- Inherited tables and callbacks.
 local g_opt, g_arch
 local wline, werror, wfatal, wwarn
+local bit = bit or require("bit")
+local band, shl, shr, bor, sar, bnot = bit.band, bit.lshift, bit.rshift, bit.bor, bit.arshift, bit.bnot
+local tohex = bit.tohex
 
 -- Action name list.
 -- CHECK: Keep this in sync with the C code!
@@ -61,6 +65,9 @@ local actargs = { 0 }
 -- Current number of section buffer positions for dasm_put().
 local secpos = 1
 
+--Function modes
+function_modes = {lsb5 = 1, msb = 2, signed = 1, split_10bit = 1}
+
 ------------------------------------------------------------------------------
 
 -- Dump action names and numbers.
@@ -88,7 +95,8 @@ end
 
 -- Add word to action list.
 local function wputxw(n)
-  assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range")
+  if ppc64 then  assert(n >= -0xffffffff and n <= 0xffffffff and n % 1 == 0, "word out of range"..n)
+  else assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range") end
   actlist[#actlist+1] = n
 end
 
@@ -124,7 +132,8 @@ end
 
 -- Store word to reserved position.
 local function wputpos(pos, n)
-  assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range")
+  if ppc64 then  assert(n >= -0xffffffff and n <= 0xffffffff and n % 1 == 0, "word out of range"..n)
+  else assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range") end
   actlist[pos] = n
 end
 
@@ -228,7 +237,7 @@ local map_cond = {
 
 ------------------------------------------------------------------------------
 
--- Template strings for PPC instructions.
+-- Template strings for PPC64 instructions.
 local map_op = {
   tdi_3 =	"08000000ARI",
   twi_3 =	"0c000000ARI",
@@ -337,9 +346,8 @@ local map_op = {
   iselgt_3 =	"7c00005eRRR",
   iseleq_3 =	"7c00009eRRR",
   mfcr_1 =	"7c000026R",
-  mfocrf_2 =	"7c100026RG",
   mtcrf_2 =	"7c000120GR",
-  mtocrf_2 =	"7c100120GR",
+  -- NYI: mtocrf, mfocrf
   lwarx_3 =	"7c000028RR0R",
   ldx_3 =	"7c00002aRR0R",
   lwzx_3 =	"7c00002eRR0R",
@@ -402,8 +410,8 @@ local map_op = {
   mfctr_1 =	"7c0902a6R",
   lwax_3 =	"7c0002aaRR0R",
   lhax_3 =	"7c0002aeRR0R",
-  mftb_1 =	"7c0c42e6R",
-  mftbu_1 =	"7c0d42e6R",
+  mftb_1 =	"7c0c42a6R",
+  mftbu_1 =	"7c0d42a6R",
   lwaux_3 =	"7c0002eaRR0R",
   lhaux_3 =	"7c0002eeRR0R",
   sthx_3 =	"7c00032eRR0R",
@@ -466,7 +474,6 @@ local map_op = {
   sraw_3 =	"7c000630RR~R.",
   srad_3 =	"7c000634RR~R.",
   srawi_3 =	"7c000670RR~A.",
-  sradi_3 =	"7c000674RR~H.",
   eieio_0 =	"7c0006ac",
   lfiwax_3 =	"7c0006aeFR0R",
   sthbrx_3 =	"7c00072cRR0R",
@@ -480,14 +487,6 @@ local map_op = {
   divdo_3 =	"7c0007d2RRR.",
   divwo_3 =	"7c0007d6RRR.",
   dcbz_2 =	"7c0007ec-RR",
-
-  -- Primary opcode 30:
-  rldicl_4 =	"78000000RR~HM.",
-  rldicr_4 =	"78000004RR~HM.",
-  rldic_4 =	"78000008RR~HM.",
-  rldimi_4 =	"7800000cRR~HM.",
-  rldcl_4 =	"78000010RR~RM.",
-  rldcr_4 =	"78000012RR~RM.",
 
   -- Primary opcode 59:
   fdivs_3 =	"ec000024FFF.",
@@ -815,7 +814,654 @@ local map_op = {
   evmwlumianw_3 =	"100005c8RRR",
   evmwlsmianw_3 =	"100005c9RRR",
 
-  -- NYI: Book E instructions.
+  --PPC64 INSTRUCTIONS0
+ 
+  -- Opcode 4
+  vaddubm_3 =		"10000000VVV",
+  vmaxub_3 =		"10000002VVV",
+  vrlb_3 =		"10000004VVV",
+  vcmpequb_3 =		"10000006VVV",
+  vmuloub_3 =		"10000008VVV",
+  vaddfp_3 =		"1000000aVVV",
+  vmrghb_3 =		"1000000cVVV",
+  vpkuhum_3 =		"1000000eVVV",
+  mulhhwu_3 =		"10000010RRR.",
+  machhwu_3 =		"10000018RRR.",
+  vmhaddshs_4 =		"10000020VVVV",
+  vmhraddshs_4 =	"10000021VVVV",
+  vmladduhm_4 =		"10000022VVVV",
+  vmsumubm_4 =		"10000024VVVV",
+  vmsummbm_4 =		"10000025VVVV",
+  vmsumuhm_4 =		"10000026VVVV",
+  vmsumuhs_4 =		"10000027VVVV",
+  vmsumshm_4 =		"10000028VVVV",
+  vmsumshs_4 =		"10000029VVVV",
+  vsel_4 =		"1000002aVVVV",
+  vperm_4 =		"1000002bVVVV",
+  vsldoi_4 =		"1000002cVVV:P",
+  vpermxor_4 =		"1000002dVVVV",
+  vmaddfp_4 =		"1000002eVVVV~",
+  vnmsubfp_4 =		"1000002fVVVV~",
+  vaddeuqm_4 =		"1000003cVVVV",
+  vaddecuq_4 =		"1000003dVVVV",
+  vsubeuqm_4 =		"1000003eVVVV",
+  vsubecuq_4 =		"1000003fVVVV",
+  vadduhm_3 =		"10000040VVV",
+  vmaxuh_3 =		"10000042VVV",
+  vrlh_3 =		"10000044VVV",
+  vcmpequh_3 =		"10000046VVV",
+  vmulouh_3 =		"10000048VVV",
+  vsubfp_3 =		"1000004aVVV",
+  vmrghh_3 =		"1000004cVVV",
+  vpkuwum_3 =		"1000004eVVV",
+  mulhhw_3 =		"10000050RRR.",
+  nmachhw_3 =		"1000005cRRR.",
+  vadduwm_3 =		"10000080VVV",
+  vmaxuw_3 =		"10000082VVV",
+  vrlw_3 =		"10000084VVV",
+  vcmpequw_3 =		"10000086VVV",
+  vmulouw_3 =		"10000088VVV",
+  vmuluwm_3 =		"10000089VVV",
+  vmrghw_3 =		"1000008cVVV",
+  vpkuhus_3 =		"1000008eVVV",
+  machhwsu_3 =		"10000098RRR.",
+  vaddudm_3 =		"100000c0VVV",
+  vmaxud_3 =		"100000c2VVV",
+  vrld_3 =		"100000c4VVV",
+  vcmpeqfp_3 =		"100000c6VVV",
+  vcmpequd_3 =		"100000c7VVV",
+  vpkuwus_3 =		"100000ceVVV",
+  machhws_3 =		"100000D8RRR.",
+  nmachhws_3 =		"100000dcRRR.",
+  vadduqm_3 =		"10000100VVV",
+  vmaxsb_3 =		"10000102VVV",
+  vslb_3 =		"10000104VVV",
+  vmulosb_3 =		"10000108VVV",
+  vrefp_2 =		"1000010aV-V",
+  vmrglb_3 =		"1000010cVVV",
+  vpkshus_3 =		"1000010eVVV",
+  mulchwu_3 =		"10000110RRR.",
+  macchwu_3 =		"10000118RRR.",
+  vaddcuq_3 =		"10000140VVV",
+  vmaxsh_3 =		"10000142VVV",
+  vslh_3 =		"10000144VVV",
+  vmulosh_3 =		"10000148VVV",
+  vrsqrtefp_2 =		"1000014aV-V",
+  vmrglh_3 =		"1000014cVVV",
+  vpkswus_3 =		"1000014eVVV",
+  mulchw_3 =		"10000150RRR.",
+  macchw_3 =		"10000158RRR.",
+  nmacchw_3 =		"1000015cRRR.",
+  vaddcuw_3 =		"10000180VVV",
+  vmaxsw_3 =		"10000182VVV",
+  vslw_3 =		"10000184VVV",
+  vmulosw_3 =		"10000188VVV",
+  vexptefp_2 =		"1000018aV-V",
+  vmrglw_3 =		"1000018cVVV",
+  vpkshss_3 =		"1000018eVVV",
+  macchwsu_3 =		"10000198RRR.",
+  vmaxsd_3 =		"100001c2VVV",
+  vsl_3 =		"100001c4VVV",
+  vcmpgefp_3 =		"100001c6VVV", 
+  vlogefp_2 =		"100001caV-V",
+  vpkswss_3 =		"100001ceVVV",
+  macchws_3 =		"100001d8RRR.",
+  nmacchws_3 =		"100001dcRRR.",
+  vadduhs_3 =		"10000240VVV",
+  vminuh_3 =		"10000242VVV",
+  vsrh_3 =		"10000244VVV",
+  vcmpgtuh_3 =		"10000246VVV",
+  vmuleuh_3 =		"10000248VVV",
+  vrfiz_2 =		"1000024aV-V",
+  vsplth_3 =		"1000024cVVa",
+  vupkhsh_2 =		"1000024eV-V",
+  vminuw_3 =		"10000282VVV",
+  vminud_3 =		"100002c2VVV",
+  vcmpgtud_3 =		"100002c7VVV",
+  vrfim_2 =		"100002caV-V",
+  vcmpgtsb_3 =		"10000306VVV",
+  vcfux_3 =		"1000030aVVy",
+  vaddshs_3 =		"10000340VVV",
+  vminsh_3 =		"10000342VVV",
+  vsrah_3 =		"10000344VVV",   
+  vcmpgtsh_3 =		"10000346VVV",
+  vmulesh_3 =		"10000348VVV",
+  vcfsx_3 =		"1000034aVVy",
+  vspltish_2 =		"1000034cV}",
+  vupkhpx_2 =		"1000034eV-V",
+  mullhw_3 =		"10000350RRR.",
+  maclhw_3 =		"10000358RRR.",
+  nmaclhw_3 =		"1000035cRRR.",
+  vaddsws_3 =		"10000380VVV",
+  vminsw_3 =		"10000382VVV",
+  vsraw_3 =		"10000384VVV",
+  vcmpgtsw_3 =		"10000386VVV",
+  vmulesw_3 =		"10000388VVV",
+  vctuxs_3 =		"1000038aVVy",
+  vspltisw_2 =		"1000038cV}",
+  maclhwsu_3 =		"10000398RRR.",
+  vminsd_3 =		"100003c2VVV",
+  vsrad_3 =		"100003c4VVV",
+  vcmpbfp_3 =		"100003c6VVV", 
+  vcmpgtsd_3 =		"100003c7VVV",
+  vctsxs_3 =		"100003caVVy",
+  vupklpx_2 =		"100003ceV-V",
+  maclhws_3 =		"100003D8RRR.",
+  nmaclhws_3 =		"100003dcRRR.",
+  vsububm_3 =		"10000400VVV",
+  ["bcdadd._4"] =	"10000401VVVN.",
+  vavgub_3 =		"10000402VVV",
+  vand_3 =		"10000404VVV",
+  ["vcmpequb._3"] =	"10000406VVV",
+  vmaxfp_3 =		"1000040aVVV",
+  machhwuo_3 =		"10000418RRR.",
+  vsubuhm_3 =		"10000440VVV",
+  ["bcdsub._4"] =	"10000441VVVN.",
+  vavguh_3 =		"10000442VVV",
+  vandc_3 =		"10000444VVV",
+  ["vcmpequh._3"] =	"10000446VVV",
+  vminfp_3 =		"1000044aVVV",
+  vpkudum_3 =		"1000044eVVV",
+  nmachhwo_3 =		"1000045cRRR.",
+  vsubuwm_3 =		"10000480VVV",
+  vavguw_3 =		"10000482VVV",
+  vor_3 =		"10000484VVV",
+  ["vcmpequw._3"] =	"10000486VVV",
+  vpmsumw_3 =		"10000488VVV",
+  machhwsuo_3 =		"10000498RRR.",
+  ["vcmpeqfp._3"] =	"100004c6VVV",
+  ["vcmpequd._3"] =	"100004c7VVV",
+  vpkudus_3 =		"100004ceVVV",
+  machhwso_3 =		"100004D8RRR.",
+  nmachhwso_3 =		"100004dcRRR.",
+  vavgsb_3 =		"10000502VVV",
+  macchwuo_3 =		"10000518RRR.",
+  vavgsh_3 =		"10000542VVV",
+  vorc_3 =		"10000544VVV",
+  vbpermq_3 =		"1000054cVVV",
+  vpksdus_3 =		"1000054eVVV",
+  macchwo_3 =		"10000558RRR.",
+  nmacchwo_3 =		"1000055cRRR.",
+  vavgsw_3 =		"10000582VVV",
+  macchwsuo_3 =		"10000598RRR.",
+  vsld_3 =		"100005c4VVV",
+  ["vcmpgefp._3"] =	"100005c6VVV",
+  vpksdss_3 =		"100005ceVVV",
+  macchwso_3 =		"100005d8RRR.",
+  nmacchwso_3 =		"100005dcRRR.",
+  vsububs_3 =		"10000600VVV",
+  mfvscr_1 =		"10000604V--",
+  vsum4ubs_3 =		"10000608VVV",
+  vsubuhs_3 =		"10000640VVV",
+  mtvscr_1 =		"10000644--V",
+  ["vcmpgtuh._3"] =	"10000646VVV",
+  vsum4shs_3 =		"10000648VVV",
+  vupkhsw_2 =		"1000064eV-V",
+  vsubuws_3 =		"10000680VVV",          
+  vshasigmaw_4 =	"10000682VVsP",
+  veqv_3 =		"10000684VVV",
+  vsum2sws_3 =		"10000688VVV",
+  vmrgow_3 =		"1000068cVVV",
+  vshasigmad_4 =	"100006c2VVsP",
+  vsrd_3 =		"100006c4VVV",
+  ["vcmpgtud._3"] =	"100006c7VVV",
+  vupklsw_2 =		"100006ceV-V",
+  vupkslw_2 =		"100006ceV-V",
+  vsubsbs_3 =		"10000700VVV",
+  vclzb_2 =		"10000702V-V",
+  vpopcntb_2 =		"10000703V-V",
+  ["vcmpgtsb._3"] =	"10000706VVV",
+  vsum4sbs_3 =		"10000708VVV",
+  vsubshs_3 =		"10000740VVV",
+  vclzh_2 =		"10000742V-V",
+  vpopcnth_2 =		"10000743V-V",
+  ["vcmpgtsh._3"] =	"10000746VVV",
+  maclhwo_3 =		"10000758RRR.",
+  nmaclhwo_3 =		"1000075cRRR.",
+  vsubsws_3 =		"10000780VVV",
+  vclzw_2 =		"10000782V-V",
+  vpopcntw_2 =		"10000783V-V",
+  ["vcmpgtsw._3"] =	"10000786VVV",
+  vsumsws_3 =		"10000788VVV",
+  vmrgew_3 =		"1000078cVVV",
+  maclhwsuo_3 =		"10000798RRR.",
+  vclzd_2 =		"100007c2V-V",
+  vpopcntd_2 =		"100007c3V-V",
+  ["vcmpbfp._3"] =	"100007c6VVV",
+  ["vcmpgtsd._3"] =	"100007c7VVV",
+  maclhwso_3 =		"100007D8RRR.",
+  nmaclhwso_3 =		"100007dcRRR.",
+
+  -- Primary Opcode 17
+  sc_1 =		"44000002?",
+
+  -- Primary Opcode 19
+  rfid_0 =		"4c000024",
+  rfmci_0 =		"4c00004c",
+  rfdi_0 =		"4c00004e",
+  rfi_0 =		"4c000064",
+  rfci_0 =		"4c000066",
+  rfgi_0 =		"4c0000cc",
+  rfebb_1 =		"4c000124p",
+  dnh_2 =		"4c00018cqQ",
+  hrfid_0 =		"4c000224",
+  doze_0 =		"4c000324",
+  nap_0 =		"4c000364",
+  sleep_0 =		"4c0003a4",
+  rvwinkle_0 =		"4c0003e4",
+  bctar_3 =		"4c000460AAr",
+  bctarl_3 =		"4c000461AAr",
+
+  -- Primary Opcode 30
+  rldicl_4 =		"78000000RR~ou.",
+  rldicr_4 =		"78000004RR~ou.", 
+  rldic_4 =		"78000008RR~ou.",
+  rldimi_4 =		"7800000cRR~o{.",
+  rldcl_4 =		"78000010RR~Ru.", 
+  rldcr_4 =		"78000012RR~Ru.",
+
+  -- Primary Opcode 31
+  lvls_3 =		"7c00000cVRR",
+  lvsl_3 =		"7c00000cVRR",
+  lxsiwzx_3 =		"7c000018iRR",
+  tlbilx_3 =		"7c000024TRR",
+  mfocrf_2 =		"7c000026RE",
+  icbt_3 =		"7c00002c:PRR",
+  ldepx_3 =		"7c00003aRRR",
+  lwepx_3 =		"7c00003eRRR",
+  lvsr_3 =		"7c00004cVRR",
+  mfvsrd_2 =		"7c000066Rn",
+  lbarx_4 =		"7c000068RRRL",
+  wait_1 =		"7c00007ce",
+  dcbstep_2 =		"7c00007e-RR",    
+  lvewx_3 =		"7c00008eVRR",  
+  addg6s_3 =		"7c000094RRR",
+  lxsiwax_3 =		"7c000098iRR",
+  dlmzb_3 =		"7c00009cRR~R.",
+  mfmsr_1 =		"7c0000a6R--",
+  lbepx_3 =		"7c0000beRRR",
+  lvx_3 =		"7c0000ceVRR",
+  mfvsrwz_2 =		"7c0000e6Rn",
+  lharx_4 =		"7c0000e8RRRL",
+  dcbfep_2 =		"7c0000fe-RR",         
+  wrtee_1 =		"7c000106R--",
+  dcbtstls_3 =		"7c00010c:PRR",
+  stvebx_3 =		"7c00010eVRR",
+  stxsiwx_3 =		"7c000118iRR",
+  msgsndp_1 =		"7c00011c--R",
+  mtmsr_1 =		"7c000124R--",
+  mtsle_1 =		"7c000126k",
+  ["stwcx._3"] =	"7c00012dRRR",
+  stdepx_3 =		"7c00013aRRR",
+  stwepx_3 =		"7c00013eRRR",
+  wrteei_1 =		"7c000146--[",
+  dcbtls_3 =		"7c00014c:PRR",
+  stvehx_3 =		"7c00014eVRR",
+  msgclrp_1 =		"7c00015c--R",
+  mtmsrd_2 =		"7c000164Rx",
+  mtvsrd_2 =		"7c000166iR",
+  ["stqcx._3"] =	"7c00016dMRR",
+  ["icblq._3"] =		"7c00018d:PRR",
+  stvewx_3 =		"7c00018eVRR",
+  msgsnd_1 =		"7c00019c--R",
+  mtsr_2 =		"7c0001a4ZR~",
+  mtvsrwa_2 =		"7c0001a6iR",
+  ["stdcx._3"] =	"7c0001adRRR",
+  stbepx_3 =		"7c0001beRRR",
+  icblc_3 =		"7c0001cc:PRR",
+  stvx_3 =		"7c0001ceVRR",
+  msgclr_1 =		"7c0001dc--R",
+  mtsrin_2 =		"7c0001e4R-R",
+  mtvsrwz_2 =		"7c0001e6iR",
+  bpermd_3 =		"7c0001f8RR~R",
+  dcbtstep_3 =		"7c0001feTRR",
+  mfdcrx_2 =		"7c000206RR",
+  mfcdrx_2 =		"7c000206RR-",
+  lvepxl_3 =		"7c00020eVRR",
+  ehpriv_0 =		"7c00021c",
+  tlbiel_1 =		"7c000224--R",
+  lqarx_4 =		"7c000228MRRL", 
+  cdtbcd_2 =		"7c000234RR~",
+  lhepx_3 =		"7c00023eRRR",
+  mfdcrux_2 =		"7c000246RR-",
+  lvepx_3 =		"7c00024eVRR",
+  mfbhrbe_2 =		"7c00025cRQ",
+  tlbie_2 =		"7c000264--R]",
+  cbcdtd_2 =		"7c000274RR~",
+  dcbtep_3 =		"7c00027eTRR",
+  mfdcr_2 =		"7c000286R*",
+  dcread_3 =		"7c00028cRRR",
+  lxvdsx_3 =		"7c000298iRR",
+  mfpmr_2 =		"7c00029cR*",
+  mfspr_2 =		"7c0002a6R*",
+  lvxl_3 =		"7c0002ceVRR",
+  tlbia_0 =		"7c0002e4",
+  popcntw_2 =		"7c0002f4RR~",
+  mtdcrx_2 =		"7c000306RR~",
+  dcblc_3 =		"7c00030c:PRR.",
+  divdeu_3 =		"7c000312RRR.",
+  divweu_3 =		"7c000316RRR.",
+  slbmte_2 =		"7c000324R-R",
+  sthepx_3 =		"7c00033eRRR",
+  mtdcrux_2 =		"7c000346RR~",
+  ["dcblq._3"] =	"7c00034dZRR",
+  divde_3 =		"7c000352RRR.",
+  divwe_3 =		"7c000356RRR.", 
+  clrbhrb_0 =		"7c00035c",
+  slbie_1 =		"7c000364--R",
+  mtdcr_2 =		"7c000386VR~",
+  dci_1 =		"7c00038c:P", 
+  mtpmr_2 =		"7c00039c|R",
+  mtspr_2 =		"7c0003a6|R",
+  dsn_2 =		"7c0003c6-RR",
+  icbtls_3 =		"7c0003cc:PRR",
+  stvxl_3 =		"7c0003ceVRR",
+  slbia_0 =		"7c0003e4",
+  popcntd_2 =		"7c0003f4RR~",
+  lbdx_3 =		"7c000406RRR",
+  lxsspx_3 =		"7c000418iRR",
+  lhdx_3 =		"7c000446RRR",
+  tlbsync_0 =		"7c00046c",
+  lwdx_3 =		"7c000486RRR",
+  lxsdx_3 =		"7C000498iRR",
+  mfsr_2 =		"7c0004a6RZ",
+  lfdepx_3 =		"7c0004beFRR",
+  lddx_3 =		"7c0004c6RRR",
+  stbdx_3 =		"7c000506RRR",
+  stxsspx_3 =		"7c000518iRR",
+  ["tbegin._1"] =	"7c00051dg",
+  mfsrin_2 =		"7c000526R-R",
+  sthdx_3 =		"7c000546RRR",
+  ["tend._0"] =		"7c00055d",
+  ["stbcx._3"] =	"7c00056dRRR",
+  ["stbcix._3"] =	"7c00056dRRR",
+  stwdx_3 =		"7c000586RRR",
+  stxsdx_3 =		"7c000598iRR",
+  tcheck_1 =		"7c00059cX",
+  ["sthcx._3"] =	"7c0005adRRR",
+  stfdepx_3 =		"7c0005beFRR",
+  stddx_3 =		"7c0005c6RRR",
+  ["tsr._1"] =		"7c0005ddk",
+  stvepxl_3 =		"7c00060eVRR",
+  lxvw4x_3 =		"7c000618iRR",
+  ["tabortwc._3"] =	"7c00061dTRR",
+  tlbivax_2 =		"7c000624-RR",
+  lwzcix_3 =		"7c00062aRRR",
+  lfdpx_3 =		"7c00062eHRR",
+  lfddx_3 =		"7c000646FRR",
+  stvepx_3 =		"7C00064eVRR",
+  ["tabortdc._3"] =	"7c00065dTRR",
+  lhzcix_3 =		"7c00066aRRR",
+  sradi_3 =		"7c000674RR~o.",
+  lxvd2x_3 =		"7c000698iRR",
+  ["tabortwci._3"] =	"7c00069dTR}",
+  ["tlbsrx._2"] =	"7c0006a5-RR",
+  slbmfev_2 =		"7c0006a6R-R",
+  lbzcix_3 =		"7c0006aaRRR",
+  ["tabortdci._3"] =	"7c0006ddTR}",
+  ldcix_3 =		"7c0006eaRRR",
+  divdeuo_3 =		"7c000712RRR.",
+  divweuo_3 =		"7c000716RRR.",
+  stxvw4x_3 =		"7c000718iRR",
+  ["tabort._1"] =	"7c00071d-R-",
+  tlbsx_2 =		"7c000724-RR",
+  slbmfee_2 =		"7c000726R-R",
+  stwcix_3 =		"7c00072aRRR",      
+  stfdpx_3 =		"7c00072eHRR",
+  stfddx_3 =		"7c000746FRR",
+  divdeo_3 =		"7c000752RRR.",
+  divweo_3 =		"7c000756RRR.",
+  ["treclaim._1"] =	"7c00075d-R",
+  tlbre_0 =		"7c000764",      
+  sthcix_3 =		"7c00076aRRR",
+  ici_1 =		"7c00078c:P--",
+  stxvd2x_3 =		"7c000798iRR",
+  tlbwe_0 =		"7c0007a4",
+  ["slbfee._2"] =	"7c0007a7R-R",
+  stbcix_3 =		"7c0007aaRRR",
+  icbiep_2 =		"7c0007be-RR",
+  icread_2 =		"7c0007cc-RR",
+  ["trechkpt._0"] =	"7c0007dd",
+  stdcix_3 =		"7c0007eaRRR",
+  dcbzep_2 =		"7c0007FE-RR",  
+  mtocrf_2 =		"7c100120/R",
+
+  -- Primary Opcode 56
+  lq_2 =		"e0000000Mc",
+
+  -- Primary Opcode 57
+  lfdp_2 =		"e4000000HD",
+
+  -- Primary Opcode 59            
+  dadd_3 =		"ec000004FFF.",
+  dqua_4 =		"ec000006FFFY.",
+  dmul_3 =		"ec000044FFF.",
+  drrnd_4 =		"ec000046FFFY.",
+  dscli_3 =		"ec000084FF{.",
+  dquai_4 =		"ec000086fF-FY.",
+  dscri_3 =		"ec0000c4FF{.",
+  drintx_4 =		"ec0000c6jF-FY.",
+  dcmpo_3 =		"ec000104XFF",
+  dtstex_3 =		"ec000144XFF",
+  dtstdc_3 =		"ec000184XF{",
+  dtstdg_3 =		"ec0001c4XF{",
+  drintn_4 =		"ec0001c6jF-FY.",
+  dctdp_2 =		"ec000204F-F.",
+  dctfix_2 =		"ec000244F-F.",
+  ddedpd_3 =		"ec000284BF-F.",
+  dxex_2 =		"ec0002c4F-F.",
+  dsub_3 =		"ec000404FFF.",
+  ddiv_3 =		"ec000444FFF.",
+  dcmpu_3 =		"ec000504XFF",
+  dtstsf_3 =		"ec000544XFF",
+  drsp_2 =		"ec000604F-F.",
+  dcffix_2 =		"ec000644F-F.",
+  denbcd_3 =		"ec000684bF-F.",
+  fcfids_2 =		"ec00069cF-F.",
+  diex_3 =		"ec0006c4FFF.",
+  fcfidus_2 =		"ec00079cF-F.",
+
+  -- Primary Opcode 60
+  xsaddsp_3 =		"f0000000@!$",
+  xsmaddasp_3 =		"f0000008@!$",
+  xxsldwi_4 =		"f0000010@!$l",
+  xsrsqrtesp_2 =	"f0000028@-$",
+  xssqrtsp_2 =		"f000002c@-$",
+  xxsel_4 =		"f0000030@!$&", 
+  xssubsp_3 =		"f0000040@!$",
+  xsmaddmsp_3 =		"f0000048@!$",
+  xxpermdi_4 =		"f0000050@!$l",
+  xsresp_2 =		"f0000068@-$", 
+  xsmulsp_3 =		"f0000080@!$",
+  xsmsubasp_3 =		"f0000088@!$",
+  xxmrghw_3 =		"f0000090@!$",
+  xsdivsp_3 =		"f00000c0@!$",
+  xsmsubmsp_3 =		"f00000c8@!$",
+  xsadddp_3 =		"f0000100@!$",
+  xsmaddadp_3 =		"f0000108@!$",
+  xscmpudp_3 =		"f0000118X!$",
+  xscvdpuxws_2 =	"f0000120@-$",
+  xsrdpi_2 =		"f0000124@-$",
+  xsrsqrtedp_2 =	"f0000128@-$",
+  xssqrtdp_2 =		"f000012c@-$",
+  xssubdp_3 =		"f0000140@!$",
+  xsmaddmdp_3 =		"f0000148@!$",
+  xscmpodp_3 =		"f0000158X!$",
+  xscvdpsxws_2 =	"f0000160@-$",
+  xsrdpiz_2 =		"f0000164@-$",
+  xsredp_2 =		"f0000168@-$",
+  xsmuldp_3 =		"f0000180@!$",
+  xsmsubadp_3 =		"f0000188@!$",
+  xxmrglw_3 =		"f0000190@!$",
+  xsrdpip_2 =		"f00001a4@-$",
+  xstsqrtdp_2 =		"f00001a8X-$",
+  xsrdpic_2 =		"f00001ac@-$",
+  xsdivdp_3 =		"f00001c0@!$",
+  xsmsubmdp_3 =		"f00001c8@!$",
+  xsrdpim_2 =		"f00001e4@-$", 
+  xstdivdp_3 =		"f00001e8X!$",
+  xvaddsp_3 =		"f0000200@!$",
+  xvmaddasp_3 =		"f0000208@!$",
+  xvcmpeqsp_3 =		"f0000218@!$", 
+  xvcvspuxws_2 =	"f0000220@-$",
+  xvrspi_2 =		"f0000224@-$",
+  xvrsqrtesp_2 =	"f0000228@-$",
+  xvsqrtsp_2 =		"f000022c@-$",
+  xvsubsp_3 =		"f0000240@!$",
+  xvmaddmsp_3 =		"f0000248@!$",
+  xvcmpgtsp_3 =		"f0000258@!$",
+  xvcvspsxws_2 =	"f0000260@-$",
+  xvrspiz_2 =		"f0000264@-$",
+  xvresp_2 =		"f0000268@-$",
+  xvmulsp_3 =		"f0000280@!$",
+  xvmsubasp_3 =		"f0000288@!$",
+  xxspltw_3 =		"f0000290@-$(",
+  xvcmpgesp_3 =		"f0000298@!$",
+  xvcvuxwsp_2 =		"f00002a0@-$",
+  xvrspip_2 =		"f00002a4@-$",
+  xvtsqrtsp_2 =		"f00002a8X-$",
+  xvrspic_2 =		"f00002ac@-$",
+  xvdivsp_3 =		"f00002c0@!$",
+  xvmsubmsp_3 =		"f00002c8@!$",
+  xvcvsxwsp_2 =		"f00002e0@-$",
+  xvrspim_2 =		"f00002e4@-$",
+  xvtdivsp_3 =		"f00002e8X!$",
+  xvadddp_3 =		"f0000300@!$",
+  xvmaddadp_3 =		"f0000308@!$",
+  xvcmpeqdp_3 =		"f0000318@!$",
+  xvcvdpuxws_2 =	"f0000320@-$",
+  xvrdpi_2 =		"f0000324@-$",
+  xvrsqrtedp_2 =	"f0000328@-$",
+  xvsqrtdp_2 =		"f000032c@-$",
+  xvsubdp_3 =		"f0000340@!$",
+  xvmaddmdp_3 =		"f0000348@!$",
+  xvcmpgtdp_3 =		"f0000358@!$",
+  xvcvdpsxws_2 =	"f0000360@-$",
+  xvrdpiz_2 =		"f0000364@-$",
+  xvredp_2 =		"f0000368@-$",
+  xvmuldp_3 =		"f0000380@!$",
+  xvmsubadp_3 =		"f0000388@!$", 
+  xvcmpgedp_3 =		"f0000398@!$",
+  xvcvuxwdp_2 =		"f00003a0@-$",
+  xvrdpip_2 =		"f00003a4@-$",
+  xvtsqrtdp_2 =		"f00003a8X-$",
+  xvrdpic_2 =		"f00003ac@-$",
+  xvdivdp_3 =		"f00003c0@!$",
+  xvmsubmdp_3 =		"f00003c8@!$",
+  xvcvsxwdp_2 =		"f00003e0@-$",
+  xvrdpim_2 =		"f00003e4@-$",
+  xvtdivdp_3 =		"f00003e8X!$",
+  xsnmaddasp_3 =	"f0000408@!$",
+  xxland_3 =		"f0000410@!$",
+  xscvdpsp_2 =		"f0000424@-$",
+  xscvdpspn_2 =		"f000042c@-$",
+  xsnmaddmsp_3 =	"f0000448@!$",
+  xxlandc_3 =		"f0000450@!$",
+  xsrsp_2 =		"f0000464@-$",
+  xsnmsubasp_3 =	"f0000488@!$",
+  xxlor_3 =		"f0000490@!$",
+  xscvuxdsp_2 =		"f00004a0@-$",
+  xsnmsubmsp_3 =	"f00004c8@!$",
+  xxlxor_3 =		"f00004d0@!$",
+  xscvsxdsp_2 =		"f00004e0@-$",
+  xsmaxdp_3 =		"f0000500@!$",
+  xsnmaddadp_3 =	"f0000508@!$",
+  xxlnor_3 =		"f0000510@!$",
+  xscvdpuxds_2 =	"f0000520@-$",
+  xscvspdp_2 =		"f0000524@-$",
+  xscvspdpn_2 =		"f000052c@-$",
+  xsmindp_3 =		"f0000540@!$",
+  xsnmaddmdp_3 =	"f0000548@!$",
+  xxlorc_3 =		"f0000550@!$",
+  xscvdpsxds_2 =	"f0000560@-$",
+  xsabsdp_2 =		"f0000564@-$",
+  xscpsgndp_3 =		"f0000580@!$",
+  xsnmsubadp_3 =	"f0000588@!$",
+  xxlnand_3 =		"f0000590@!$",
+  xscvuxddp_2 =		"f00005a0@-$",
+  xsnabsdp_2 =		"f00005a4@-$",
+  xsnmsubmdp_3 =	"f00005c8@!$",
+  xxleqv_3 =		"f00005d0@!$",
+  xscvsxddp_2 =		"f00005e0@-$",
+  xsnegdp_2 =		"f00005e4@-$",
+  xvmaxsp_3 =		"f0000600@!$",
+  xvnmaddasp_3 =	"f0000608@!$",
+  ["xvcmpeqsp._3"] =	"f0000618@!$",
+  xvcvspuxds_2 =	"f0000620@-$",
+  xvcvdpsp_2 =		"f0000624@-$",
+  xvminsp_3 =		"f0000640@!$",
+  xvnmaddmsp_3 =	"f0000648@!$",
+  ["xvcmpgtsp._3"] =	"f0000658@!$",
+  xvcvspsxds_2 =	"f0000660@-$",
+  xvabssp_2 =		"f0000664@-$",
+  xvcpsgnsp_3 =		"f0000680@!$",
+  xvnmsubasp_3 =	"f0000688@!$",
+  ["xvcmpgesp._3"] =	"f0000698@!$",
+  xvcvuxdsp_2 =		"f00006a0@-$",
+  xvnabssp_2 =		"f00006a4@-$",
+  xvnmsubmsp_3 =	"f00006c8@!$",
+  xvcvsxdsp_2 =		"f00006e0@-$",
+  xvnegsp_2 =		"f00006e4@-$",
+  xvmaxdp_3 =		"f0000700@!$",
+  xvnmaddadp_3 =	"f0000708@!$",
+  ["xvcmpeqdp._3"] =	"f0000718@!$",
+  xvcvdpuxds_2 =	"f0000720@-$",
+  xvcvspdp_2 =		"f0000724@-$",
+  xvmindp_3 =		"f0000740@!$",
+  xvnmaddmdp_3 =	"f0000748@!$",
+  ["xvcmpgtdp._3"] =	"f0000758@!$",
+  xvcvdpsxds_2 =	"f0000760@-$",
+  xvabsdp_2 =		"f0000764@-$",
+  xvcpsgndp_3 =		"f0000780@!$",
+  xvnmsubadp_3 =	"f0000788@!$",
+  ["xvcmpgedp._3"] =	"f0000798@!$",
+  xvcvuxddp_2 =		"f00007a0@-$",
+  xvnabsdp_2 =		"f00007a4@-$",
+  xvnmsubmdp_3 =	"f00007c8@!$",
+  xvcvsxddp_2 =		"f00007e0@-$",
+  xvnegdp_2 =		"f00007e4@-$",
+
+  -- Primary Opcode 61  
+  stfdp_2 =		"f4000000HD",
+
+  -- Primary Opcode 62
+  stq_2 =		"F8000002M<",
+
+  -- Primary Opcode 63
+  daddq_3 =		"fc000004HHH.",
+  dquaq_4 =		"fc000006HHHY.",
+  dmulq_3 =		"fc000044HHH.",
+  drrndq_4 =		"fc000046HHHY.",
+  dscliq_3 =		"fc000084HH{.",
+  dquaiq_4 =		"fc000086fH-HY.",
+  dscriq_3 =		"fc0000c4HH{.",
+  drintxq_4 =		"fc0000c6jH-HY.",
+  ftdiv_3 =		"fc000100XFF",
+  dcmpoq_3 =		"fc000104XHH",
+  fctiwu_2 =		"fc00011cF-F.",
+  fctiwuz_2 =		"fc00011eF-F.",
+  ftsqrt_2 =		"fc000140X-F",
+  dtstexq_3 =		"fc000144XHH",
+  dtstdcq_3 =		"fc000184XH{",
+  dtstdgq_3 =		"fc0001c4XH{",
+  drintnq_4 =		"fc0001c6jH-HY.",
+  dctqpq_2 =		"fc000204H-H.",
+  dctfixq_2 =		"fc000244H-H.",
+  ddedpdq_3 =		"fc000284BH-H.",
+  dxexq_2 =		"fc0002c4H-H.",
+  dsubq_3 =		"fc000404HHH.",
+  ddivq_3 =		"fc000444HHH.",
+  dcmpuq_3 =		"fc000504XHH",
+  dtstsfq_3 =		"fc000544XHH",
+  mtfsf_4 =		"fc00058ezFwx.",
+  drdpq_2 =		"fc000604H-H.",
+  dcffixq_2 =		"fc000644H-H.",
+  denbcdq_3 =		"fc000684bH-H.",
+  fmrgow_3 =		"fc00068cFFF",
+  diexq_3 =		"fc0006c4HHH.",
+  fctidu_2 =		"fc00075cF-F.",
+  fctiduz_2 =		"fc00075eF-F.",
+  fmrgew_3 =		"fc00078cFFF",
 }
 
 -- Add mnemonics for "." variants.
@@ -835,7 +1481,7 @@ end
 -- Add more branch mnemonics.
 for cond,c in pairs(map_cond) do
   local b1 = "b"..cond
-  local c1 = shl(band(c, 3), 16) + (c < 4 and 0x01000000 or 0)
+  local c1 = (c%4)*0x00010000 + (c < 4 and 0x01000000 or 0)
   -- bX[l]
   map_op[b1.."_1"] = tohex(0x40800000 + c1).."K"
   map_op[b1.."y_1"] = tohex(0x40a00000 + c1).."K"
@@ -855,9 +1501,10 @@ for cond,c in pairs(map_cond) do
   map_op[b1.."ctrl_1"] = tohex(0x4c800421 + c1).."-X"
 end
 
-------------------------------------------------------------------------------
-
-local function parse_gpr(expr)
+-- Parse GPR (Fixed Point Registers) : r[0-31]
+-- Pair == 0 : standard mode
+-- Pair == 1 : pair mode (even address only)
+local function parse_gpr(expr) 
   local tname, ovreg = match(expr, "^([%w_]+):(r[1-3]?[0-9])$")
   local tp = map_type[tname or expr]
   if tp then
@@ -870,26 +1517,111 @@ local function parse_gpr(expr)
   local r = match(expr, "^r([1-3]?[0-9])$")
   if r then
     r = tonumber(r)
-    if r <= 31 then return r, tp end
+    if r <= 31 then
+        return r, tp 
+    end
   end
   werror("bad register name `"..expr.."'")
 end
 
+local function parse_gpr_pair(expr) 
+  local tname, ovreg = match(expr, "^([%w_]+):(r[1-3]?[0-9])$")
+  local tp = map_type[tname or expr]
+  if tp then
+    local reg = ovreg or tp.reg
+    if not reg then
+      werror("type `"..(tname or expr).."' needs a register override")
+    end
+    expr = reg
+  end
+  local r = match(expr, "^r([1-3]?[0-9])$")
+  if r then
+    r = tonumber(r)
+    if r <= 31 then
+      if r%2 == 0 then
+        return r, tp 
+      else
+        werror("bad register pair (address must be even) `"..expr.."'")
+      end
+    end
+  end
+  werror("bad register name `"..expr.."'")
+end
+
+-- Parse VR (Vector Registers) : v[0-31]
+local function parse_vr(expr)
+  local tname, ovreg = match(expr, "^([%w_]+):(v[1-3]?[0-9])$")
+  local tp = map_type[tname or expr]
+  if tp then
+    local reg = ovreg or tp.reg
+    if not reg then
+      werror("type `"..(tname or expr).."' needs a register override")
+    end
+    expr = reg
+  end
+  local r = match(expr, "^v([1-3]?[0-9])$")
+  if r then
+    r = tonumber(r)
+    if r <= 31 then return r, tp end
+  end
+  werror("bad vector register name `"..expr.."'")
+end
+
+-- Parse VS (Vector Scalar Registers) : vs[0-63]
+local function parse_vs(expr, mode)
+  if mode == nil then mode = 0 end
+  local r = match(expr, "^vs([1-6]?[0-9])$")
+  if r then
+    r = tonumber(r)
+    if r <= 63 and r >= 0 then
+      if mode == function_modes.lsb5 then
+        return band(r, 31)
+      elseif mode == 0 then
+        return r
+      elseif mode == function_modes.msb then 
+        return shr(band(r, 32), 5)
+      end
+    end
+  end
+  werror("bad vector-scalar extension name `"..expr.."'")
+end
+
+-- Parse Floating Point Registers : f[0-31]
 local function parse_fpr(expr)
   local r = match(expr, "^f([1-3]?[0-9])$")
   if r then
     r = tonumber(r)
-    if r <= 31 then return r end
+    if r <= 31 then 
+      return r 
+    end
   end
   werror("bad register name `"..expr.."'")
 end
 
+-- Parse Floating Point Registers Pairs : f[0-31] (even)
+local function parse_fpr_pair(expr)
+  local r = match(expr, "^f([1-3]?[0-9])$")
+  if r then
+    r = tonumber(r)
+    if r <= 31 then 
+      if r%2 == 0 then
+        return r 
+      else
+        werror ("bad register pair (address must be even) `"..expr.."'")
+      end
+    end
+  end
+  werror("bad register name `"..expr.."'")
+end
+
+-- Parses CR Fields
 local function parse_cr(expr)
   local r = match(expr, "^cr([0-7])$")
   if r then return tonumber(r) end
   werror("bad condition register name `"..expr.."'")
 end
 
+-- Parse Conditionals
 local function parse_cond(expr)
   local r, cond = match(expr, "^4%*cr([0-7])%+(%w%w)$")
   if r then
@@ -910,12 +1642,18 @@ local function parse_imm(imm, bits, shift, scale, signed)
 	if s == 0 then return shl(m, shift)
 	elseif s == -1 then return shl(m + shl(1, bits), shift) end
       else
-	if sar(m, bits) == 0 then return shl(m, shift) end
+ if sar(m, bits) == 0 then return shl(m, shift) end
       end
     end
     werror("out of range immediate `"..imm.."'")
   elseif match(imm, "^r([1-3]?[0-9])$") or
-	 match(imm, "^([%w_]+):(r[1-3]?[0-9])$") then
+         match(imm, "^([%w_]+):(r[1-3]?[0-9])$") or 
+         match(imm, "^f([1-3]?[0-9])$") or
+         match(imm, "^([%w_]+):(f[1-3]?[0-9])$") or 
+         match(imm, "^v([1-3]?[0-9])$") or
+         match(imm, "^([%w_]+):(v[1-3]?[0-9])$") or
+         match(imm, "^vs([1-3]?[0-9])$") or
+         match(imm, "^([%w_]+):(vs[1-3]?[0-9])$") then
     werror("expected immediate operand, got register")
   else
     waction("IMM", (signed and 32768 or 0)+scale*1024+bits*32+shift, imm)
@@ -923,29 +1661,30 @@ local function parse_imm(imm, bits, shift, scale, signed)
   end
 end
 
-local function parse_shiftmask(imm, isshift)
-  local n = tonumber(imm)
-  if n then
-    if shr(n, 6) == 0 then
-      local lsb = band(imm, 31)
-      local msb = imm - lsb
-      return isshift and (shl(lsb, 11)+shr(msb, 4)) or (shl(lsb, 6)+msb)
-    end
-    werror("out of range immediate `"..imm.."'")
-  elseif match(imm, "^r([1-3]?[0-9])$") or
-	 match(imm, "^([%w_]+):(r[1-3]?[0-9])$") then
-    werror("expected immediate operand, got register")
-  else
-    werror("NYI: parameterized 64 bit shift/mask")
+-- Identify and split 10 bit field, depending o type
+local function parse_10bit_field(expr, type)
+  if type == nil then type = 0 end
+  local r = parse_imm(expr, 10, 0, 0, false)
+  if r then
+  if r <= 1023 and r >= 0 then
+    if type == 0 then
+      return r 
+    else
+      return bor(shl(band(r, 31), 5), shr(band(r, 992), 5));
+    end 
   end
+  werror("out of range immediate `"..expr.."'")
+  end
+  werror("Invalid immediate Â´`"..expr.."'")
 end
 
+-- Parse Displacements
 local function parse_disp(disp)
   local imm, reg = match(disp, "^(.*)%(([%w_:]+)%)$")
   if imm then
     local r = parse_gpr(reg)
-    if r == 0 then werror("cannot use r0 in displacement") end
-    return shl(r, 16) + parse_imm(imm, 16, 0, 0, true)
+  if r == 0 then werror("cannot use r0 in displacement") end
+    return r*65536 + parse_imm(imm, 16, 0, 0, true)
   end
   local reg, tailr = match(disp, "^([%w_:]+)%s*(.*)$")
   if reg and tailr ~= "" then
@@ -953,18 +1692,22 @@ local function parse_disp(disp)
     if r == 0 then werror("cannot use r0 in displacement") end
     if tp then
       waction("IMM", 32768+16*32, format(tp.ctypefmt, tailr))
-      return shl(r, 16)
+      return r*65536
     end
   end
   werror("bad displacement `"..disp.."'")
 end
 
-local function parse_u5disp(disp, scale)
+-- Parse U Displacement
+local function parse_udisp(disp, scale, size)
   local imm, reg = match(disp, "^(.*)%(([%w_:]+)%)$")
+  if size == nil then size = 5 end
   if imm then
     local r = parse_gpr(reg)
     if r == 0 then werror("cannot use r0 in displacement") end
-    return shl(r, 16) + parse_imm(imm, 5, 11, scale, false)
+    if size == 5 then  return r*65536 + parse_imm(imm, 5, 11, scale, false) 
+    elseif size == 12 then return r*65536 + parse_imm(imm, 12, 0, scale, true);
+    elseif size == 14 then return r*65536 + parse_imm(imm, 14, 0, scale, true); end
   end
   local reg, tailr = match(disp, "^([%w_:]+)%s*(.*)$")
   if reg and tailr ~= "" then
@@ -972,12 +1715,13 @@ local function parse_u5disp(disp, scale)
     if r == 0 then werror("cannot use r0 in displacement") end
     if tp then
       waction("IMM", scale*1024+5*32+11, format(tp.ctypefmt, tailr))
-      return shl(r, 16)
+      return r*65536
     end
   end
   werror("bad displacement `"..disp.."'")
 end
 
+-- Parse Labels
 local function parse_label(label, def)
   local prefix = sub(label, 1, 2)
   -- =>label (pc label reference)
@@ -1008,15 +1752,13 @@ local function parse_label(label, def)
   werror("bad label `"..label.."'")
 end
 
-------------------------------------------------------------------------------
-
 -- Handle opcodes defined with template strings.
 map_op[".template__"] = function(params, template, nparams)
   if not params then return sub(template, 9) end
   local op = tonumber(sub(template, 1, 8), 16)
   local n, rs = 1, 26
-
-  -- Limit number of section buffer positions used by a single dasm_put().
+  
+  -- Limit number of section buffer positions used bmakey a single dasm_put().
   -- A single opcode needs a maximum of 3 positions (rlwinm).
   if secpos+3 > maxsecpos then wflush() end
   local pos = wpos()
@@ -1024,57 +1766,203 @@ map_op[".template__"] = function(params, template, nparams)
   -- Process each character.
   for p in gmatch(sub(template, 9), ".") do
     if p == "R" then
-      rs = rs - 5; op = op + shl(parse_gpr(params[n]), rs); n = n + 1
+      rs = rs - 5; op = op + parse_gpr(params[n]) * 2^rs; n = n + 1;
+    elseif p == "V" then
+      rs = rs - 5;  op = op + parse_vr(params[n]) * 2^rs; n = n + 1;
     elseif p == "F" then
-      rs = rs - 5; op = op + shl(parse_fpr(params[n]), rs); n = n + 1
-    elseif p == "A" then
-      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, false); n = n + 1
-    elseif p == "S" then
-      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, true); n = n + 1
-    elseif p == "I" then
-      op = op + parse_imm(params[n], 16, 0, 0, true); n = n + 1
-    elseif p == "U" then
-      op = op + parse_imm(params[n], 16, 0, 0, false); n = n + 1
-    elseif p == "D" then
-      op = op + parse_disp(params[n]); n = n + 1
-    elseif p == "2" then
-      op = op + parse_u5disp(params[n], 1); n = n + 1
-    elseif p == "4" then
-      op = op + parse_u5disp(params[n], 2); n = n + 1
-    elseif p == "8" then
-      op = op + parse_u5disp(params[n], 3); n = n + 1
-    elseif p == "C" then
-      rs = rs - 5; op = op + shl(parse_cond(params[n]), rs); n = n + 1
-    elseif p == "X" then
-      rs = rs - 5; op = op + shl(parse_cr(params[n]), rs+2); n = n + 1
-    elseif p == "W" then
-      op = op + parse_cr(params[n]); n = n + 1
-    elseif p == "G" then
-      op = op + parse_imm(params[n], 8, 12, 0, false); n = n + 1
-    elseif p == "H" then
-      op = op + parse_shiftmask(params[n], true); n = n + 1
+      rs = rs - 5; op = op + parse_fpr(params[n]) * 2^rs; n = n + 1;
+    elseif p == "v" then
+      rs = rs - 5; op = op + parse_imm(params[n], 6, rs, 0, false); n = n + 1;
+    elseif p == "o" then
+      local value = parse_imm(params[n], 6, 0, 0, false)
+      local bit_value = shr(value, 5)
+      value = band(value, 31) rs = rs - 5; 
+      op = op + value * 2^rs; op = bor(shl(bit_value, 1), op); n = n + 1;
+    elseif p == "?" then
+      local value = parse_imm(params[n], 7, 0, 0, false); op = bor(shl(value, 5), op); n = n + 1;
+    elseif p == "i" then
+      rs = rs - 5; 
+      op = op + parse_vs(params[n], function_modes.lsb5) * 2^rs + parse_vs(params[n], function_modes.msb); 
+      n = n + 1;
+    elseif p == "n" then
+      local first_register = shr(band(op, 65011712), 21);
+      op = band(op, -65011713); 
+      op = op + parse_vs(params[n], function_modes.lsb5) * 2^rs + parse_vs(params[n], function_modes.msb); 
+      rs = rs - 5; op = op + first_register * 2^rs; 
+      n = n + 1;
+    elseif p == "L" then 
+      op = op + parse_imm(params[n], 1, 0, 0, false); n = n + 1;
     elseif p == "M" then
-      op = op + parse_shiftmask(params[n], false); n = n + 1
+      rs = rs - 5; op = op + parse_gpr_pair(params[n]) * 2^rs; n = n + 1;
+    elseif p == "H" then
+      rs = rs - 5; op = op + parse_fpr_pair(params[n]) * 2^rs; n = n + 1;
+    elseif p == "Z" then
+      rs = rs - 5; op = op + parse_imm(params[n], 4, rs, 0, false); n = n + 1;
+    elseif p == "k" then
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 21), op); 
+      rs = rs - 1; n = n + 1;
+    elseif p == "p" then
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 11), op); 
+      rs = rs - 1; n = n + 1;
+    elseif p == "m" then
+      op = bor(shl(parse_imm(params[n], 3, 0, 0, false), 21), op); 
+      n = n + 1;
+    elseif p == "N" then
+      op = bor(shl(1, 10), op); 
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 9), op); 
+      n = n + 1;
+    elseif p == "A" then
+      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, false); n = n + 1;
+    elseif p == "}" then
+      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, true); n = n + 1;
+    elseif p == "h" then
+      rs = rs - 5; op = op + parse_imm(params[n], 2, rs, 0, false); n = n + 1;
+    elseif p == "S" then
+      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, true); n = n + 1;
+    elseif p == "I" then
+      op = op + parse_imm(params[n], 16, 0, 0, true); n = n + 1;
+    elseif p == "U" then
+      op = op + parse_imm(params[n], 16, 0, 0, false); n = n + 1;
+    elseif p == "D" then
+      op = op + parse_disp(params[n]); n = n + 1;
+    elseif p == "2" then
+      op = op + parse_udisp(params[n], 1); n = n + 1;
+    elseif p == "4" then
+      op = op + parse_udisp(params[n], 2); n = n + 1;
+    elseif p == "8" then
+      op = op + parse_udisp(params[n], 3); n = n + 1;
+    elseif p == "c" then
+      op = op + parse_udisp(params[n], 0, 12); n = n + 1;
+    elseif p == "<" then 
+      op = op + parse_udisp(params[n], 0, 14); n = n + 1;
+    elseif p == "C" then
+      rs = rs - 5; op = op + parse_cond(params[n]) * 2^rs; n = n + 1;
+    elseif p == "X" then
+      rs = rs - 5; op = op + parse_cr(params[n]) * 2^(rs + 2); n = n + 1;
+    elseif p == "W" then
+      op = op + parse_cr(params[n]); n = n + 1;
+    elseif p == "B" then
+      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 19), op); n = n + 1;
+    elseif p == "t" then
+      op = bor(shl(parse_imm(params[n], 5, 0, 0, false), 16), op); n = n + 1;
+    elseif p == "f" then
+      op = bor(shl(parse_imm(params[n], 5, 0, 0, true), 16), op); n = n + 1;
+    elseif p == "z" then
+      op = bor(shl(parse_imm(params[n], 8, 0, 0, false), 17), op); rs = rs - 10; n = n + 1;
+    elseif p == "w" then
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 25), op); n = n + 1;
+    elseif p == "@" then
+      local vs_value = parse_vs(params[n]);
+      local msb = shr(band(vs_value, 32), 5);
+      vs_value = band(vs_value, 31);
+      rs = rs - 5; op = op + vs_value * 2^rs + msb; n = n + 1;
+    elseif p == "!" then
+      local vs_value = parse_vs(params[n]);
+      local msb = shr(band(vs_value, 32), 5);
+      vs_value = band(vs_value, 31);
+      rs = rs - 5; op = op + vs_value * 2^rs + msb * 4; n = n + 1;
+    elseif p == "$" then
+      local vs_value = parse_vs(params[n]);
+      local msb = shr(band(vs_value, 32), 5);
+      vs_value = band(vs_value, 31);
+      rs = rs - 5; op = op + vs_value * 2^rs + msb * 2; n = n + 1;
+    elseif p == "&" then
+      local vs_value = parse_vs(params[n]);
+      local msb = shr(band(vs_value, 32), 5);
+      vs_value = band(vs_value, 31);
+      rs = rs - 5; op = op + vs_value * 2^rs + msb * 8; n = n + 1;
+    elseif p == "l" then
+      rs = rs - 3; op = op + parse_imm(params[n], 2, rs, 0, false); n = n + 1;
+    elseif p == "x" then
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 16), op); n = n + 1;
+    elseif p == "b" then
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 20), op); n = n + 1;
+    elseif p == "j" then
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 16), op); n = n + 1;
+    elseif p == "G" then
+      op = op + parse_imm(params[n], 8, 12, 0, false); n = n + 1;
+    elseif p == "P" then
+      rs = rs - 4; op = op + parse_imm(params[n], 4, rs, 0, false); n = n + 1;
+    elseif p == "T" then
+      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, false); n = n + 1;
+    elseif p == "q" then
+      rs = rs - 5; op = op + parse_imm(params[n], 5, rs, 0, false); n = n + 1;
+    elseif p == "y" then
+      local vb_value = shr(band(op, 2031616), 16);
+      op = band(op, 4292935679);
+      op = op + parse_imm(params[n], 5, 0, 0, false) * 2^rs;  
+      op = bor(shl(vb_value, 11), op); n = n + 1;
+    elseif p == "a" then
+      local vb_value = shr(band(op, 2031616), 16);
+      op = band(op, 4292935679);
+      op = op + parse_imm(params[n], 3, 0, 0, false) * 2^rs;  
+      op = bor(shl(vb_value, 11), op); n = n + 1;
+    elseif p == "Q" then
+      rs = rs - 10; op = op + parse_10bit_field(params[n]) * 2^rs; n = n + 1;
+    elseif p == "*" then
+      rs = rs - 10; op = op + parse_10bit_field(params[n], function_modes.split_10bit) * 2^rs; n = n + 1;
+    elseif p == "s" then
+      rs = rs - 1;  op = op + parse_imm(params[n], 1, rs, 0, false);  n = n + 1;
+    elseif p == "e" then
+      rs = rs - 5; op = op + parse_imm(params[n], 2, rs, 0, false); n = n + 1;
+    elseif p == "g" then
+      rs = rs - 5; op = op + parse_imm(params[n], 1, rs, 0, false); n = n + 1;
+    elseif p == "]" then
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 21), op); n = n + 1;
+    elseif p == "[" then
+      op = bor(shl(parse_imm(params[n], 1, 0, 0, false), 15), op); n = n + 1;
+    elseif p == "Y" then 
+      rs = rs - 2; op = op + parse_imm(params[n], 2, rs, 0, false); n = n + 1;
+    elseif p == "(" then
+      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 16), op); n = n + 1;
+    elseif p == "r" then
+      rs = rs - 5; op = op + parse_imm(params[n], 2, rs, 0, false); n = n + 1;
+    elseif p == "O" then
+      rs = rs - 15; op = op + parse_imm(params[n], 15, rs, 0, false); n = n + 1;
+    elseif p == "E" then
+      rs = rs - 1; op = op + 1 * 2^rs; rs = rs - 8; 
+      op = op + parse_imm(params[n], 8, rs, 0, false); n = n + 1;
+    elseif p == "/" then
+      local value = parse_imm(params[n], 8, 0, 0, false); op = bor(op, shl(value, 12)); n = n + 1;
+    elseif p == "|" then
+      local value = parse_10bit_field(params[n], function_modes.split_10bit); op = bor(op, shl(value, 11)); n = n + 1;
+    elseif p == "u" then
+      rs = rs - 5; op = op + parse_imm(params[n], 6, rs, 0, false); n = n + 1;
+    elseif p == "{" then
+     rs = rs - 6; op = op + parse_imm(params[n], 6, rs, 0, false); n = n + 1;
+    elseif p == "d" then
+      op = bor(shl(parse_imm(params[n], 2, 0, 0, false), 16), op); n = n + 1
     elseif p == "J" or p == "K" then
       local mode, n, s = parse_label(params[n], false)
       if p == "K" then n = n + 2048 end
       waction("REL_"..mode, n, s, 1)
       n = n + 1
     elseif p == "0" then
-      if band(shr(op, rs), 31) == 0 then werror("cannot use r0") end
+      local mm = 2^rs
+      local t = op % mm
+      if ((op - t) / mm) % 32 == 0 then werror("cannot use r0") end
     elseif p == "=" or p == "%" then
-      local t = band(shr(op, p == "%" and rs+5 or rs), 31)
+      local mm = 2^(rs + (p == "%" and 5 or 0))
+      local t = ((op - op % mm) / mm) % 32
       rs = rs - 5
-      op = op + shl(t, rs)
+      op = op + t * 2^rs
     elseif p == "~" then
-      local mm = shl(31, rs)
-      local lo = band(op, mm)
-      local hi = band(op, shl(mm, 5))
-      op = op - lo - hi + shl(lo, 5) + shr(hi, 5)
+      local mm = 2^rs
+      local t1l = op % mm
+      local t1h = (op - t1l) / mm
+      local t2l = t1h % 32
+      local t2h = (t1h - t2l) / 32
+      local t3l = t2h % 32
+      op = ((t2h - t3l + t2l)*32 + t3l)*mm + t1l
     elseif p == "-" then
       rs = rs - 5
+    elseif p == ":" then
+      rs = rs - 1
     elseif p == "." then
       -- Ignored.
+    elseif p == "," then
+       local vb_value = band(op, 1024);
+       n = n + 1;
     else
       assert(false)
     end
@@ -1246,4 +2134,3 @@ end
 return _M
 
 ------------------------------------------------------------------------------
-
